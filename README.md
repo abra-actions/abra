@@ -1,4 +1,4 @@
-<span style="color: #25D366; position: relative; display: inline-block;">abra<span style="position: absolute; width: 100%; height: 0.15em; background-color: rgba(37, 211, 102, 0.2); left: 0; bottom: 0.1em; z-index: -1;"></span></span> - AI-Powered Function Discovery and Execution
+# abra - AI-Powered Function Discovery and Execution
 
 ## 🚀 Overview
 
