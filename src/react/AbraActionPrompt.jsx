@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { executeAction, getAllActions } from "../core/executor";
-import { fetchLLMResponse } from "../core/llm";
+import { fetchLLMResponse, fetchSuggestedActions } from "../core/llm";
+import "../AbraAssistant.css";
 
 export function AbraActionPrompt() {
     const [input, setInput] = useState("");
@@ -10,10 +11,60 @@ export function AbraActionPrompt() {
     const [error, setError] = useState(null);
     const [actions, setActions] = useState([]);
     const [expanded, setExpanded] = useState(false);
+    const [showThinking, setShowThinking] = useState(false);
+    const [thinkingSteps, setThinkingSteps] = useState([]);
+    const [currentThinkingStep, setCurrentThinkingStep] = useState(0);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [suggestedActions, setSuggestedActions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const textInputRef = useRef(null);
+    const contentRef = useRef(null);
 
-    React.useEffect(() => {
+    useEffect(() => {
         setActions(getAllActions());
     }, []);
+
+    useEffect(() => {
+        if (expanded && textInputRef.current) {
+            textInputRef.current.focus();
+        }
+    }, [expanded]);
+
+    useEffect(() => {
+        const adjustHeight = () => {
+            if (contentRef.current && expanded) {
+                const contentHeight = contentRef.current.scrollHeight;
+                const maxHeight = window.innerHeight * 0.8;
+                const minHeight = 300;
+                
+                contentRef.current.style.maxHeight = Math.max(minHeight, Math.min(contentHeight + 40, maxHeight)) + 'px';
+                
+                setTimeout(() => {
+                    if (contentRef.current) {
+                        contentRef.current.scrollTop = contentRef.current.scrollHeight;
+                    }
+                }, 50);
+            }
+        };
+
+        adjustHeight();
+        
+        const observer = new MutationObserver(adjustHeight);
+        
+        if (contentRef.current) {
+            observer.observe(contentRef.current, { 
+                childList: true, 
+                subtree: true,
+                characterData: true
+            });
+        }
+        window.addEventListener('resize', adjustHeight);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', adjustHeight);
+        };
+    }, [expanded, showThinking, currentThinkingStep, showSuccess, showSuggestions]);
 
     const handleExecute = async () => {
         if (!input.trim()) {
@@ -22,35 +73,92 @@ export function AbraActionPrompt() {
         }
 
         setIsLoading(true);
-        setStatus("🔍 Analyzing your request...");
+        setShowThinking(true);
+        setCurrentThinkingStep(0);
         setResult(null);
         setError(null);
+        setShowSuccess(false);
+        setShowSuggestions(false);
+        
+        // Define thinking steps based on the user's request
+        const steps = [
+            "Analyzing your request...",
+            "Identifying appropriate action...",
+            "Validating parameters...",
+            "Preparing execution...",
+            "Processing request..."
+        ];
+        
+        setThinkingSteps(steps);
+        
+        // Simulate thinking progress
+        let currentStep = 0;
+        const thinkingInterval = setInterval(() => {
+            if (currentStep < steps.length - 1) {
+                currentStep++;
+                setCurrentThinkingStep(currentStep);
+            } else {
+                clearInterval(thinkingInterval);
+            }
+        }, 800);
         
         try {
             const aiResponse = await fetchLLMResponse(input);
             
             if (!aiResponse || !aiResponse.action) {
-                setError("AI couldn't determine an appropriate action for your request.");
-                setStatus("⚠️ Request analysis failed.");
+                // AI couldn't determine the action, so let's get suggestions
+                clearInterval(thinkingInterval);
+                setCurrentThinkingStep(thinkingSteps.length - 1); // Complete the thinking animation
+                
+                // Get suggested actions based on available actions
+                try {
+                    // Use the existing actions in state or getAllActions()
+                    const availableActions = actions.length ? actions : getAllActions();
+                    const suggestions = await fetchSuggestedActions(input, availableActions);
+                    setSuggestedActions(suggestions.slice(0, 4)); // Limit to 4 suggestions
+                    setShowSuggestions(true);
+                    setStatus("I'm not sure what you want to do. Would you like to try one of these?");
+                } catch (suggestErr) {
+                    // If fetching suggestions fails, just show a generic set of actions
+                    const availableActions = actions.length ? actions : getAllActions();
+                    setSuggestedActions(availableActions.slice(0, 4).map(a => ({
+                        name: a.name,
+                        description: a.description || a.name
+                    })));
+                    setShowSuggestions(true);
+                }
+                
+                setShowThinking(false);
                 setIsLoading(false);
                 return;
             }
 
-            setStatus(`🧠 Selected action: ${aiResponse.action}`);
+            setStatus(`Selected action: ${aiResponse.action}`);
             
             // Execute the action
             const executionResult = await executeAction(aiResponse.action, aiResponse.params || {});
             
+            clearInterval(thinkingInterval);
+            setShowThinking(false);
+            
             if (executionResult.success) {
                 setResult(executionResult.result);
-                setStatus(`✅ Successfully executed: ${executionResult.action}`);
+                setShowSuccess(true);
+                setStatus(`Successfully executed: ${executionResult.action}`);
+                
+                // Auto-hide success message after 3 seconds
+                setTimeout(() => {
+                    setShowSuccess(false);
+                }, 3000);
             } else {
                 setError(executionResult.error || "Unknown error occurred");
-                setStatus(`❌ Execution failed: ${executionResult.error}`);
+                setStatus(`Execution failed: ${executionResult.error}`);
             }
         } catch (err) {
+            clearInterval(thinkingInterval);
+            setShowThinking(false);
             setError(err.message || "An unexpected error occurred");
-            setStatus("❌ Request failed");
+            setStatus("Request failed");
         } finally {
             setIsLoading(false);
         }
@@ -58,54 +166,83 @@ export function AbraActionPrompt() {
 
     const toggleExpanded = () => {
         setExpanded(!expanded);
+        if (!expanded) {
+            // Reset state when opening
+            setInput("");
+            setStatus("");
+            setResult(null);
+            setError(null);
+            setShowThinking(false);
+            setShowSuccess(false);
+            setShowSuggestions(false);
+            setSuggestedActions([]);
+        }
     };
+
+    const handleSuggestionClick = (suggestion) => {
+        setInput(suggestion.description || suggestion.name);
+        setShowSuggestions(false);
+        // Let the user confirm by pressing send
+        if (textInputRef.current) {
+            textInputRef.current.focus();
+        }
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!input.trim() || isLoading) return;
+        handleExecute();
+    };
+
+    if (!expanded) {
+        return (
+            <div className="abra-button-container">
+                <button 
+                    className="abra-circle-button" 
+                    onClick={toggleExpanded}
+                    aria-label="Open Abra Assistant"
+                >
+                    <span className="abra-at-symbol">@</span>
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="abra-container">
-            <div className="user-interface-mock">
-                {!expanded ? (
-                    <div className="collapsed-view" onClick={toggleExpanded}>
-                        <div className="chat-button">
-                            <span className="at-symbol">@</span>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="expanded-view">
-                        <div className="chat-button" onClick={toggleExpanded}>
-                            <span className="at-symbol">@</span>
-                        </div>
-                        <div className="input-expanded">
-                            <input
-                                type="text"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                placeholder="Describe what you want to do..."
-                                className="input-text"
-                                disabled={isLoading}
-                            />
-                            <div 
-                                className="send-button" 
-                                onClick={handleExecute}
-                                style={{opacity: isLoading ? 0.5 : 1}}
-                            >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                    <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                )}
+            <div className="abra-header">
+                <h3 className="abra-title">Abra Assistant</h3>
+                <button 
+                    className="abra-close-button" 
+                    onClick={toggleExpanded}
+                    aria-label="Close Abra Assistant"
+                >
+                    ×
+                </button>
             </div>
-            
-            {(status || error || result) && expanded && (
-                <div className="abra-results-container">
-                    {status && (
-                        <div className="abra-status">
-                            {status}
+            <div ref={contentRef} className="abra-content">
+                <div className="abra-message-container">
+                    <div className="abra-message">
+                        I can execute functions in this application through natural language. What would you like to do?
+                    </div>
+
+                    {showThinking && (
+                        <div className="abra-thinking-container">
+                            {thinkingSteps.map((step, index) => (
+                                <div key={index} className="abra-thinking-step">
+                                    {currentThinkingStep > index ? (
+                                        <span className="abra-step-checkmark">✓</span>
+                                    ) : currentThinkingStep === index ? (
+                                        <span className="abra-loader"></span>
+                                    ) : (
+                                        <span style={{width: '20px'}}></span>
+                                    )}
+                                    {step}
+                                </div>
+                            ))}
                         </div>
                     )}
-                    
+
                     {error && (
                         <div className="abra-error">
                             <h4>Error</h4>
@@ -113,130 +250,51 @@ export function AbraActionPrompt() {
                         </div>
                     )}
                     
-                    {result && (
-                        <div className="abra-result">
-                            <h4>Result</h4>
-                            <pre>{JSON.stringify(result, null, 2)}</pre>
+                    {showSuccess && result && (
+                        <div className="abra-success-message">
+                            ✅ Action completed successfully
+                            <pre style={{marginTop: '10px', fontSize: '0.85rem'}}>{JSON.stringify(result, null, 2)}</pre>
+                        </div>
+                    )}
+                    
+                    {showSuggestions && suggestedActions.length > 0 && (
+                        <div className="abra-suggestion-container">
+                            {suggestedActions.map((action, index) => (
+                                <button 
+                                    key={index} 
+                                    className="abra-suggestion-button"
+                                    onClick={() => handleSuggestionClick(action)}
+                                >
+                                    {action.description || action.name}
+                                </button>
+                            ))}
                         </div>
                     )}
                 </div>
-            )}
-            
-            <style jsx>{`
-                .abra-container {
-                    font-family: 'Roboto Mono', monospace;
-                    max-width: 800px;
-                    margin: 0 auto;
-                    padding: 20px;
-                }
                 
-                .user-interface-mock {
-                    display: flex;
-                    align-items: center;
-                    position: relative;
-                    margin-bottom: 15px;
-                }
-
-                .chat-button {
-                    width: 40px;
-                    height: 40px;
-                    background-color: var(--primary, #25D366);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin-right: 10px;
-                    box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);
-                    flex-shrink: 0;
-                    cursor: pointer;
-                }
-
-                .at-symbol {
-                    color: black;
-                    font-weight: bold;
-                    font-size: 1.2rem;
-                    font-family: 'Roboto Mono', monospace;
-                }
-
-                .input-expanded {
-                    display: flex;
-                    align-items: center;
-                    background-color: var(--surface, #1A1A1A);
-                    border-radius: 20px;
-                    padding: 10px 15px;
-                    flex: 1;
-                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-                }
-
-                .input-text {
-                    flex: 1;
-                    color: var(--text, #F0F0F0);
-                    font-family: 'Roboto Mono', monospace;
-                    font-size: 0.9rem;
-                    background: transparent;
-                    border: none;
-                    outline: none;
-                }
-
-                .send-button {
-                    width: 24px;
-                    height: 24px;
-                    background-color: var(--primary, #25D366);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin-left: 10px;
-                    color: black;
-                    cursor: pointer;
-                }
-                
-                .expanded-view {
-                    display: flex;
-                    width: 100%;
-                    align-items: center;
-                }
-                
-                .collapsed-view {
-                    cursor: pointer;
-                }
-                
-                .abra-results-container {
-                    margin-top: 20px;
-                }
-                
-                .abra-status {
-                    margin-bottom: 20px;
-                    padding: 10px;
-                    background-color: var(--surface, #1A1A1A);
-                    border-radius: 4px;
-                    color: var(--text, #F0F0F0);
-                }
-                
-                .abra-error {
-                    padding: 15px;
-                    margin-bottom: 20px;
-                    background-color: rgba(244, 67, 54, 0.1);
-                    border-left: 5px solid #f44336;
-                    border-radius: 4px;
-                    color: var(--text, #F0F0F0);
-                }
-                
-                .abra-result {
-                    padding: 15px;
-                    margin-bottom: 20px;
-                    background-color: rgba(76, 175, 80, 0.1);
-                    border-left: 5px solid #4CAF50;
-                    border-radius: 4px;
-                    overflow-x: auto;
-                    color: var(--text, #F0F0F0);
-                }
-                
-                .abra-result pre {
-                    margin: 0;
-                    white-space: pre-wrap;
-                }
-            `}</style>
+                <form onSubmit={handleSubmit} className="abra-input-container">
+                    <input
+                        ref={textInputRef}
+                        type="text"
+                        placeholder="Type what you want to do..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        className="abra-input"
+                        disabled={isLoading}
+                    />
+                    <button 
+                        type="submit" 
+                        className="abra-send-button"
+                        aria-label="Send message"
+                        disabled={isLoading}
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight: '-1px', marginTop: '0px'}}>
+                            <path d="M22 2L11 13" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </button>
+                </form>
+            </div>
         </div>
     );
 }

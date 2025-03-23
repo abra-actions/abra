@@ -115,6 +115,73 @@ IMPORTANT GUIDELINES:
     }
 }
 
+export async function fetchSuggestedActions(userInput, availableActions) {
+    if (!apiKey) {
+        return getDefaultSuggestions(availableActions);
+    }
+
+    const systemPrompt = `You are an AI assistant that suggests appropriate actions based on user requests.
+Your job is to:
+1. Analyze the user's request
+2. Select the most appropriate actions from the available options
+3. Return a list of 3-4 suggested actions as JSON
+
+Available actions:
+${availableActions.map(action => 
+    `- ${action.name}: ${action.description || action.name}`
+).join('\n')}
+
+IMPORTANT GUIDELINES:
+- Select the MOST appropriate actions based on the user's request
+- Return ONLY valid JSON in the format: [{ "name": "actionName", "description": "User-friendly description" }, ...]
+- Try to be as accurate as possible in mapping user intent to the available actions
+- Return 3-4 suggestions at most
+`;
+
+    try {
+        console.log("🤖 Sending suggestion request to LLM...");
+        
+        const response = await openai.chat.completions.create({
+            model: llmConfig.model,
+            temperature: 0.3,
+            max_tokens: 200,
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Suggest actions for: "${userInput}"` }
+            ],
+            response_format: { type: "json_object" }
+        });
+
+        const content = response.choices[0].message.content;
+        console.log("🤖 LLM suggestion response:", content);
+        
+        try {
+            const parsedResponse = JSON.parse(content);
+            if (Array.isArray(parsedResponse)) {
+                return parsedResponse;
+            } else if (parsedResponse.suggestions && Array.isArray(parsedResponse.suggestions)) {
+                return parsedResponse.suggestions;
+            } else {
+                return getDefaultSuggestions(availableActions);
+            }
+        } catch (err) {
+            console.error("❌ Error parsing LLM suggestion response as JSON:", err);
+            return getDefaultSuggestions(availableActions);
+        }
+    } catch (err) {
+        console.error("❌ Error calling OpenAI for suggestions:", err);
+        return getDefaultSuggestions(availableActions);
+    }
+}
+
+function getDefaultSuggestions(availableActions) {
+    // Return up to 4 available actions as default suggestions
+    return availableActions.slice(0, 4).map(action => ({
+        name: action.name,
+        description: action.description || `Try ${action.name}`
+    }));
+}
+
 export function getAvailableActions() {
     return actions.map(action => ({
         name: action.name,
