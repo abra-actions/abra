@@ -1,6 +1,6 @@
 {
   "name": "abra-actions",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Abra SDK for AI-powered frontend actions",
   "main": "src/index.js",
   "bin": {
