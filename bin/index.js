@@ -4,160 +4,164 @@ import * as ts from 'typescript';
 import fs from 'fs';
 import path from 'path';
 
-function getAllTSFiles(dir, files = []) {
-  for (const file of fs.readdirSync(dir)) {
+// === File discovery ===
+function getAllTSFiles(dir, fileList = []) {
+  const files = fs.readdirSync(dir);
+  for (const file of files) {
     const fullPath = path.join(dir, file);
     if (fs.statSync(fullPath).isDirectory()) {
-      getAllTSFiles(fullPath, files);
-    } else if (file.endsWith(".ts")) {
-      files.push(fullPath);
+      getAllTSFiles(fullPath, fileList);
+    } else if (file.endsWith('.ts') && !file.endsWith('.d.ts')) {
+      fileList.push(fullPath);
     }
   }
-  return files;
+  return fileList;
 }
 
-function createProgram(projectRoot) {
-  const fileNames = getAllTSFiles(path.join(projectRoot, 'src'));
-  return ts.createProgram(fileNames, {
-    target: ts.ScriptTarget.ESNext,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.NodeJs,
-    allowJs: true,
-    checkJs: false,
-    jsx: ts.JsxEmit.React
-  });
+// === Helper: is valid exported function with @abra-action ===
+function isAbraAction(fn, sourceText) {
+  const comments = ts.getLeadingCommentRanges(sourceText, fn.pos);
+  return comments?.some(r => sourceText.slice(r.pos, r.end).includes('@abra-action'));
 }
 
-function isBuiltIn(typeName) {
-  return ['string', 'number', 'boolean', 'any', 'undefined', 'null'].includes(typeName);
-}
+// === Helper: flatten custom types into primitives ===
+function serializeType(type, checker, seen = new Set()) {
+  if (!type || seen.has(type)) return 'any';
+  seen.add(type);
 
-function flattenType(type, typeChecker, visited = new Set()) {
-  if (!type || visited.has(type)) return {};
-  visited.add(type);
+  if (type.flags & ts.TypeFlags.String) return 'string';
+  if (type.flags & ts.TypeFlags.Number) return 'number';
+  if (type.flags & ts.TypeFlags.Boolean) return 'boolean';
+  if (type.flags & ts.TypeFlags.Null) return 'null';
+  if (type.flags & ts.TypeFlags.Undefined) return 'undefined';
+  if (type.flags & ts.TypeFlags.Any || type.flags & ts.TypeFlags.Unknown) return 'any';
 
   if (type.isUnion()) {
-    const types = type.types.map(t => typeChecker.typeToString(t));
-    return { type: types.join(" | ") };
+    const literals = type.types.map(t => serializeType(t, checker, new Set(seen)));
+    const flattened = literals.flat();
+    const isAllLiterals = flattened.every(t => typeof t === 'string' || typeof t === 'number' || typeof t === 'boolean');
+    return isAllLiterals ? flattened : 'any';
   }
 
-  const props = {};
-  for (const prop of type.getProperties()) {
-    const name = prop.getName();
-    const propType = typeChecker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration ?? prop.declarations?.[0]);
-    const propTypeStr = typeChecker.typeToString(propType);
-
-    if (propType.getProperties && propType.getProperties().length > 0 && !isBuiltIn(propTypeStr)) {
-      const nested = flattenType(propType, typeChecker, visited);
-      for (const key in nested) {
-        props[`${name}.${key}`] = nested[key];
-      }
-    } else {
-      props[name] = propTypeStr;
-    }
+  if (checker.isArrayType(type)) {
+    const elementType = checker.getTypeArguments(type)[0];
+    return { type: 'array', items: serializeType(elementType, checker, new Set(seen)) };
   }
-  return props;
+
+  const props = type.getProperties?.();
+  if (!props || !props.length) return checker.typeToString(type);
+
+  const result = {};
+  for (const prop of props) {
+    const propType = checker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration || prop.declarations[0]);
+    result[prop.name] = serializeType(propType, checker, new Set(seen));
+  }
+  return result;
 }
 
-function extractActions(program, projectRoot) {
-  const typeChecker = program.getTypeChecker();
+// === CLI Main ===
+function main(projectRoot) {
+  const files = getAllTSFiles(path.join(projectRoot, 'src'));
+  const program = ts.createProgram(files, { allowJs: false });
+  const checker = program.getTypeChecker();
+
   const actions = [];
 
   for (const sourceFile of program.getSourceFiles()) {
-    if (sourceFile.isDeclarationFile || sourceFile.fileName.includes("node_modules")) continue;
+    if (sourceFile.isDeclarationFile || sourceFile.fileName.includes('node_modules')) continue;
+    const sourceText = sourceFile.getFullText();
 
     ts.forEachChild(sourceFile, node => {
-      if (
-        ts.isFunctionDeclaration(node) &&
-        node.name &&
-        node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)
-      ) {
-        const text = sourceFile.getFullText();
-        const comments = ts.getLeadingCommentRanges(text, node.pos);
-        const hasAnnotation = comments?.some(r =>
-          text.substring(r.pos, r.end).includes("@abra-action")
-        );
+      if (ts.isFunctionDeclaration(node) && node.name && node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) {
+        if (!isAbraAction(node, sourceText)) return;
 
-        if (hasAnnotation) {
-          const parameters = {};
-          node.parameters.forEach(param => {
-            const paramName = param.name.getText(sourceFile);
-            const paramType = typeChecker.getTypeAtLocation(param);
-            const flattened = flattenType(paramType, typeChecker);
-            for (const key in flattened) {
-              parameters[`${paramName}.${key}`] = flattened[key];
-            }
-          });
+        const fnName = node.name.text;
+        const params = {};
 
-          actions.push({
-            name: node.name.text,
-            description: `Execute ${node.name.text}`,
-            parameters,
-            module: sourceFile.fileName
-          });
+        for (const param of node.parameters) {
+          const paramName = param.name.getText();
+          const paramType = checker.getTypeAtLocation(param);
+          params[paramName] = serializeType(paramType, checker);
         }
+
+        actions.push({
+          name: fnName,
+          description: `Execute ${fnName}`,
+          parameters: params,
+          module: sourceFile.fileName
+        });
+
+        console.log(`✅ Found @abra-action: ${fnName}`);
       }
     });
   }
 
-  return actions;
+  writeActionsJson(actions, projectRoot);
+  writeActionRegistry(actions, projectRoot);
+  writeExecutor(projectRoot);
+  writeAbraComponent(projectRoot);
 }
 
-function generateActionsJson(projectRoot, actions) {
-  const out = path.join(projectRoot, 'src/actions/actions.json');
-  fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, JSON.stringify({ actions }, null, 2));
-  console.log(`✅ actions.json generated at ${out}`);
+// === Writers ===
+
+function writeActionsJson(actions, root) {
+  const out = {
+    actions,
+    typeAliases: {} // future support if needed
+  };
+  const file = path.join(root, 'src/actions/actions.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(out, null, 2));
+  console.log(`✅ Wrote actions.json`);
 }
 
-function generateActionRegistry(projectRoot, actions) {
+function writeActionRegistry(actions, root) {
   let imports = '';
-  let entries = '';
+  let registry = '';
 
-  actions.forEach(action => {
-    const relPath = path.relative(
-      path.join(projectRoot, 'src/actions'),
-      action.module.replace(/\.ts$/, '')
-    ).replace(/\\/g, '/');
-
-    imports += `import { ${action.name} } from '${relPath}';\n`;
-    entries += `  ${action.name},\n`;
+  actions.forEach(a => {
+    const fromPath = path.dirname(path.join(root, 'src/actions/actionRegistry.js'));
+    const importPath = './' + path.relative(fromPath, a.module).replace(/\.ts$/, '').replace(/\\/g, '/');
+    imports += `import { ${a.name} } from '${importPath}';\n`;
+    registry += `  ${a.name},\n`;
   });
 
-  const content = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
+  const out = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
 ${imports}
 const actionRegistry = {
-${entries}};
+${registry}};
 export default actionRegistry;`;
 
-  const out = path.join(projectRoot, 'src/actions/actionRegistry.js');
-  fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, content);
-  console.log(`✅ actionRegistry.js generated at ${out}`);
+  const file = path.join(root, 'src/actions/actionRegistry.js');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, out);
+  console.log(`✅ Wrote actionRegistry.js`);
 }
 
-function generateExecutor(projectRoot) {
-  const content = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
+function writeExecutor(root) {
+  const out = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
 import actionRegistry from './actionRegistry';
 
 export async function executeAction(actionName, params) {
-  const actionFn = actionRegistry[actionName];
-  if (!actionFn) throw new Error(\`Action "\${actionName}" is not registered.\`);
+  const fn = actionRegistry[actionName];
+  if (!fn) throw new Error(\`Action "\${actionName}" is not registered.\`);
   try {
-    const result = await actionFn(params);
+    const result = await fn(params);
     return { success: true, result };
-  } catch (error) {
-    return { success: false, error: error.message };
+  } catch (err) {
+    return { success: false, error: err.message };
   }
-}`;
-  const out = path.join(projectRoot, 'src/actions/abra-executor.js');
-  fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, content);
-  console.log(`✅ abra-executor.js generated at ${out}`);
+}
+`;
+
+  const file = path.join(root, 'src/actions/abra-executor.js');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, out);
+  console.log(`✅ Wrote abra-executor.js`);
 }
 
-function generateAbraComponent(projectRoot) {
-  const content = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
+function writeAbraComponent(root) {
+  const out = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
 import React, { useState } from "react";
 import actionsJson from '../actions/actions.json';
 import { executeAction } from '../actions/abra-executor';
@@ -198,16 +202,13 @@ export function AbraActionPrompt() {
     {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
   </div>);
 }`;
-  const out = path.join(projectRoot, 'src/components/AbraActionPrompt.jsx');
-  fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, content);
-  console.log(`✅ AbraActionPrompt.jsx generated at ${out}`);
+
+  const file = path.join(root, 'src/components/AbraActionPrompt.jsx');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, out);
+  console.log(`✅ Wrote AbraActionPrompt.jsx`);
 }
 
+// === Run CLI
 const projectRoot = process.argv[2] || process.cwd();
-const program = createProgram(projectRoot);
-const actions = extractActions(program, projectRoot);
-generateActionsJson(projectRoot, actions);
-generateActionRegistry(projectRoot, actions);
-generateExecutor(projectRoot);
-generateAbraComponent(projectRoot);
+main(projectRoot);
