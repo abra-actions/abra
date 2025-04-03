@@ -1,6 +1,6 @@
 {
   "name": "abra-actions",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Abra CLI for AI-powered frontend actions",
   "bin": {
     "abra-actions": "bin/index.js"
