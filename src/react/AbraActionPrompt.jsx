@@ -17,44 +17,55 @@ export function AbraActionPrompt() {
 
     const handleExecute = async () => {
         if (!input.trim()) {
-            setStatus("⚠️ Please enter a request.");
-            return;
+          setStatus("⚠️ Please enter a request.");
+          return;
         }
-
+      
         setIsLoading(true);
         setStatus("🔍 Analyzing your request...");
         setResult(null);
         setError(null);
-        
+      
         try {
-            const aiResponse = await fetchLLMResponse(input);
-            
-            if (!aiResponse || !aiResponse.action) {
-                setError("AI couldn't determine an appropriate action for your request.");
-                setStatus("⚠️ Request analysis failed.");
-                setIsLoading(false);
-                return;
-            }
-
-            setStatus(`🧠 Selected action: ${aiResponse.action}`);
-            
-            // Execute the action
-            const executionResult = await executeAction(aiResponse.action, aiResponse.params || {});
-            
-            if (executionResult.success) {
-                setResult(executionResult.result);
-                setStatus(`✅ Successfully executed: ${executionResult.action}`);
-            } else {
-                setError(executionResult.error || "Unknown error occurred");
-                setStatus(`❌ Execution failed: ${executionResult.error}`);
-            }
-        } catch (err) {
-            setError(err.message || "An unexpected error occurred");
-            setStatus("❌ Request failed");
-        } finally {
+          const response = await fetch('http://localhost:4000/api/resolve-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userIntent: input, actions })
+          });
+      
+          if (!response.ok) {
+            throw new Error(`Backend error: ${response.statusText}`);
+          }
+      
+          const aiResponse = await response.json();
+      
+          if (!aiResponse.action) {
+            setError("AI couldn't determine an appropriate action for your request.");
+            setStatus("⚠️ Request analysis failed.");
             setIsLoading(false);
+            return;
+          }
+      
+          setStatus(`🧠 Selected action: ${aiResponse.action}`);
+      
+          // Execute the frontend action
+          const executionResult = await executeAction(aiResponse.action, aiResponse.params || {});
+      
+          if (executionResult.success) {
+            setResult(executionResult.result);
+            setStatus(`✅ Successfully executed: ${executionResult.action}`);
+          } else {
+            setError(executionResult.error || "Unknown execution error");
+            setStatus(`❌ Execution failed: ${executionResult.error}`);
+          }
+        } catch (err) {
+          setError(err.message || "An unexpected error occurred");
+          setStatus("❌ Request failed");
+        } finally {
+          setIsLoading(false);
         }
-    };
+      };
+      
 
     const toggleExpanded = () => {
         setExpanded(!expanded);
