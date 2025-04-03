@@ -4,104 +4,138 @@ import * as ts from 'typescript';
 import fs from 'fs';
 import path from 'path';
 
-// Utility to recursively find all .ts files
-function getTypeDefinitionFiles(dir, fileList = []) {
-  const files = fs.readdirSync(dir);
-  files.forEach((file) => {
-    const filePath = path.join(dir, file);
-    if (fs.statSync(filePath).isDirectory()) {
-      if (!["node_modules", "dist", "build"].some(exclude => filePath.includes(exclude))) {
-        getTypeDefinitionFiles(filePath, fileList);
-      }
-    } else if (file.endsWith(".ts") && filePath.includes("/src/")) {
-      fileList.push(filePath);
-    }
-  });
-  return fileList;
-}
-
-// Create TypeScript program
-function createProgram(projectRoot) {
-  const tsFiles = getTypeDefinitionFiles(projectRoot);
-  const tsconfigPath = path.join(projectRoot, 'tsconfig.json');
-
-  let compilerOptions = {
-    target: ts.ScriptTarget.ES2020,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.NodeJs,
-    esModuleInterop: true,
-    allowSyntheticDefaultImports: true,
-    resolveJsonModule: true
-  };
-
-  if (fs.existsSync(tsconfigPath)) {
-    const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
-    if (!configFile.error) {
-      const parsedConfig = ts.parseJsonConfigFileContent(configFile.config, ts.sys, projectRoot);
-      if (!parsedConfig.errors.length) {
-        compilerOptions = parsedConfig.options;
-      }
+function getAllTSFiles(dir, files = []) {
+  for (const file of fs.readdirSync(dir)) {
+    const fullPath = path.join(dir, file);
+    if (fs.statSync(fullPath).isDirectory()) {
+      getAllTSFiles(fullPath, files);
+    } else if (file.endsWith(".ts")) {
+      files.push(fullPath);
     }
   }
-
-  return ts.createProgram(tsFiles, compilerOptions);
+  return files;
 }
 
-// Collect types from files
-function collectTypeDefinitions(program) {
+function createProgram(projectRoot) {
+  const fileNames = getAllTSFiles(path.join(projectRoot, 'src'));
+  return ts.createProgram(fileNames, {
+    target: ts.ScriptTarget.ESNext,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.NodeJs,
+    allowJs: true,
+    checkJs: false,
+    jsx: ts.JsxEmit.React
+  });
+}
+
+function isBuiltIn(typeName) {
+  return ['string', 'number', 'boolean', 'any', 'undefined', 'null'].includes(typeName);
+}
+
+function flattenType(type, typeChecker, visited = new Set()) {
+  if (!type || visited.has(type)) return {};
+  visited.add(type);
+
+  if (type.isUnion()) {
+    const types = type.types.map(t => typeChecker.typeToString(t));
+    return { type: types.join(" | ") };
+  }
+
+  const props = {};
+  for (const prop of type.getProperties()) {
+    const name = prop.getName();
+    const propType = typeChecker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration ?? prop.declarations?.[0]);
+    const propTypeStr = typeChecker.typeToString(propType);
+
+    if (propType.getProperties && propType.getProperties().length > 0 && !isBuiltIn(propTypeStr)) {
+      const nested = flattenType(propType, typeChecker, visited);
+      for (const key in nested) {
+        props[`${name}.${key}`] = nested[key];
+      }
+    } else {
+      props[name] = propTypeStr;
+    }
+  }
+  return props;
+}
+
+function extractActions(program, projectRoot) {
   const typeChecker = program.getTypeChecker();
-  const typeDefinitions = new Map();
+  const actions = [];
 
-  program.getSourceFiles().forEach((sourceFile) => {
-    if (sourceFile.isDeclarationFile || sourceFile.fileName.includes('node_modules')) return;
+  for (const sourceFile of program.getSourceFiles()) {
+    if (sourceFile.isDeclarationFile || sourceFile.fileName.includes("node_modules")) continue;
 
-    ts.forEachChild(sourceFile, (node) => {
-      if ((ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) &&
-          node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) {
-        const typeName = node.name.text;
-        const type = typeChecker.getTypeAtLocation(node.name);
-        typeDefinitions.set(typeName, { name: typeName, type, file: sourceFile.fileName });
+    ts.forEachChild(sourceFile, node => {
+      if (
+        ts.isFunctionDeclaration(node) &&
+        node.name &&
+        node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)
+      ) {
+        const text = sourceFile.getFullText();
+        const comments = ts.getLeadingCommentRanges(text, node.pos);
+        const hasAnnotation = comments?.some(r =>
+          text.substring(r.pos, r.end).includes("@abra-action")
+        );
+
+        if (hasAnnotation) {
+          const parameters = {};
+          node.parameters.forEach(param => {
+            const paramName = param.name.getText(sourceFile);
+            const paramType = typeChecker.getTypeAtLocation(param);
+            const flattened = flattenType(paramType, typeChecker);
+            for (const key in flattened) {
+              parameters[`${paramName}.${key}`] = flattened[key];
+            }
+          });
+
+          actions.push({
+            name: node.name.text,
+            description: `Execute ${node.name.text}`,
+            parameters,
+            module: sourceFile.fileName
+          });
+        }
       }
     });
-  });
+  }
 
-  return typeDefinitions;
+  return actions;
 }
 
-// Generate actions.json
 function generateActionsJson(projectRoot, actions) {
-  const outputPath = path.join(projectRoot, "actions.json");
-  fs.writeFileSync(outputPath, JSON.stringify({ actions }, null, 2));
-  console.log(`✅ actions.json generated at ${outputPath}`);
+  const out = path.join(projectRoot, 'src/actions/actions.json');
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, JSON.stringify({ actions }, null, 2));
+  console.log(`✅ actions.json generated at ${out}`);
 }
 
-// Generate actionRegistry.js
 function generateActionRegistry(projectRoot, actions) {
   let imports = '';
-  let registryEntries = '';
+  let entries = '';
 
   actions.forEach(action => {
-    const relativePath = './' + path.relative(
+    const relPath = path.relative(
       path.join(projectRoot, 'src/actions'),
       action.module.replace(/\.ts$/, '')
     ).replace(/\\/g, '/');
-    imports += `import { ${action.name} } from '${relativePath}';\n`;
-    registryEntries += `  ${action.name},\n`;
+
+    imports += `import { ${action.name} } from '${relPath}';\n`;
+    entries += `  ${action.name},\n`;
   });
 
   const content = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
 ${imports}
 const actionRegistry = {
-${registryEntries}};
+${entries}};
 export default actionRegistry;`;
 
-  const outputPath = path.join(projectRoot, 'src/actions/actionRegistry.js');
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, content);
-  console.log(`✅ actionRegistry.js generated at ${outputPath}`);
+  const out = path.join(projectRoot, 'src/actions/actionRegistry.js');
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, content);
+  console.log(`✅ actionRegistry.js generated at ${out}`);
 }
 
-// Generate abra-executor.js
 function generateExecutor(projectRoot) {
   const content = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
 import actionRegistry from './actionRegistry';
@@ -116,14 +150,12 @@ export async function executeAction(actionName, params) {
     return { success: false, error: error.message };
   }
 }`;
-
-  const outputPath = path.join(projectRoot, 'src/actions/abra-executor.js');
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, content);
-  console.log(`✅ abra-executor.js generated at ${outputPath}`);
+  const out = path.join(projectRoot, 'src/actions/abra-executor.js');
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, content);
+  console.log(`✅ abra-executor.js generated at ${out}`);
 }
 
-// Generate AbraActionPrompt.jsx
 function generateAbraComponent(projectRoot) {
   const content = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
 import React, { useState } from "react";
@@ -143,7 +175,8 @@ export function AbraActionPrompt() {
     setIsLoading(true); setStatus("Resolving action...");
     try {
       const res = await fetch(\`\${BACKEND_URL}/api/resolve-action\`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userIntent: input, actions: actionsJson.actions })
       });
       const aiResponse = await res.json();
@@ -165,41 +198,16 @@ export function AbraActionPrompt() {
     {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
   </div>);
 }`;
-
-  const outputPath = path.join(projectRoot, 'src/components/AbraActionPrompt.jsx');
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, content);
-  console.log(`✅ AbraActionPrompt.jsx generated at ${outputPath}`);
+  const out = path.join(projectRoot, 'src/components/AbraActionPrompt.jsx');
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, content);
+  console.log(`✅ AbraActionPrompt.jsx generated at ${out}`);
 }
 
-// MAIN FUNCTION (clearly run everything)
-function main(projectRoot) {
-  const program = createProgram(projectRoot);
-  const typeChecker = program.getTypeChecker();
-
-  const actions = [];
-  program.getSourceFiles().forEach(sourceFile => {
-    if (sourceFile.isDeclarationFile || sourceFile.fileName.includes('node_modules')) return;
-    ts.forEachChild(sourceFile, node => {
-      if (ts.isFunctionDeclaration(node) && node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) {
-        const text = sourceFile.getFullText();
-        const comments = ts.getLeadingCommentRanges(text, node.pos);
-        if (comments && comments.some(range => text.substring(range.pos, range.end).includes('@abra-action'))) {
-          actions.push({
-            name: node.name.text,
-            module: sourceFile.fileName
-          });
-        }
-      }
-    });
-  });
-
-  generateActionsJson(projectRoot, actions);
-  generateActionRegistry(projectRoot, actions);
-  generateExecutor(projectRoot);
-  generateAbraComponent(projectRoot);
-}
-
-// Run main CLI
 const projectRoot = process.argv[2] || process.cwd();
-main(projectRoot);
+const program = createProgram(projectRoot);
+const actions = extractActions(program, projectRoot);
+generateActionsJson(projectRoot, actions);
+generateActionRegistry(projectRoot, actions);
+generateExecutor(projectRoot);
+generateAbraComponent(projectRoot);
