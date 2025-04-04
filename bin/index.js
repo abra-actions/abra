@@ -293,7 +293,7 @@ const AbraAssistant = () => {
     setError(null);
     
     try {
-      const res = await fetch(\`${BACKEND_URL}/api/resolve-action\`, {
+      const res = await fetch(\`\${BACKEND_URL}/api/resolve-action\`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userIntent: input, actions: actionsJson.actions })
@@ -304,7 +304,7 @@ const AbraAssistant = () => {
       
       if (executionResult.success) {
         setResult(executionResult.result);
-        setStatus(\`✅ Executed: ${aiResponse.action}\`);
+        setStatus(\`✅ Executed: \${aiResponse.action}\`);
         setShowSuccess(true);
         
         // Reset after showing success for a moment
