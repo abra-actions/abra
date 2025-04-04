@@ -439,35 +439,37 @@ function writeAssistantStyles(root) {
   const file = path.join(root, 'src/abra-actions/AbraAssistant.css');
   const content = `.abra-button-container {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 32px;
+  right: 32px;
   z-index: 9999;
 }
 
 .abra-circle-button {
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background-color: #5cdb95;
+  background-color: #00FFB2;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(92, 219, 149, 0.4);
   border: none;
-  z-index: 100;
-  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(0, 255, 178, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.abra-circle-button:hover {
+  transform: scale(1.06);
+  box-shadow: 0 8px 24px rgba(0, 255, 178, 0.4);
 }
 
-.abra-circle-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(92, 219, 149, 0.5);
-}
 
 .abra-at-symbol {
-  font-size: 26px;
+  font-size: 24px;
   color: #121212;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .abra-container {
@@ -499,7 +501,7 @@ function writeAssistantStyles(root) {
   justify-content: space-between;
   align-items: center;
   padding: 14px 18px;
-  background: #5cdb95;
+  background: #00FFB2;
   color: #121212;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
@@ -572,7 +574,7 @@ function writeAssistantStyles(root) {
   border-radius: 8px;
   padding: 14px;
   background-color: rgba(30, 30, 30, 0.7);
-  border-left: 2px solid #5cdb95;
+  border-left: 2px solid #00FFB2;
   animation: abra-fade-slide-in 0.3s ease forwards;
 }
 
@@ -598,7 +600,7 @@ function writeAssistantStyles(root) {
 
 .abra-step-complete {
   margin-right: 12px;
-  color: #5cdb95;
+  color: #00FFB2;
   font-weight: bold;
 }
 
@@ -614,7 +616,7 @@ function writeAssistantStyles(root) {
   width: 14px;
   height: 14px;
   border: 2px solid rgba(92, 219, 149, 0.2);
-  border-top: 2px solid #5cdb95;
+  border-top: 2px solid #00FFB2;
   border-radius: 50%;
   animation: abra-spin 1s linear infinite;
   display: inline-block;
@@ -655,11 +657,11 @@ function writeAssistantStyles(root) {
 .abra-success-message {
   margin-top: 12px;
   font-size: 13px;
-  color: #5cdb95;
+  color: #00FFB2;
   padding: 12px 14px;
   border-radius: 6px;
   background: rgba(92, 219, 149, 0.1);
-  border-left: 3px solid #5cdb95;
+  border-left: 3px solid #00FFB2;
   animation: abra-success-pulse 2s ease;
 }
 
@@ -709,7 +711,7 @@ function writeAssistantStyles(root) {
 
 .abra-input:focus {
   outline: none;
-  border-color: #5cdb95;
+  border-color: #00FFB2;
   background: rgba(40, 40, 40, 0.9);
   box-shadow: 0 0 0 2px rgba(92, 219, 149, 0.15);
 }
@@ -719,7 +721,7 @@ function writeAssistantStyles(root) {
 }
 
 .abra-send-button {
-  background: #5cdb95;
+  background: #00FFB2;
   color: #121212;
   border: none;
   width: 36px;
