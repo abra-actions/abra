@@ -359,7 +359,7 @@ const AbraAssistant = () => {
           {isProcessing && (
             <div className="abra-processing-container">
               {processingSteps.map((step, index) => (
-                <div key={index} className={\`abra-processing-step ${processingStep >= index ? 'active' : ''}\`}>
+                <div key={index} className={\`abra-processing-step \${processingStep >= index ? 'active' : ''}\`}>
                   {processingStep > index ? (
                     <span className="abra-step-complete">✓</span>
                   ) : processingStep === index ? (
@@ -374,7 +374,7 @@ const AbraAssistant = () => {
           )}
 
           {status && !isProcessing && (
-            <div className={\`abra-status ${error ? 'abra-error' : ''}\`}>
+            <div className={\`abra-status \${error ? 'abra-error' : ''}\`}>
               {status}
             </div>
           )}
