@@ -109,28 +109,50 @@ function generateActionsManifest(projectRoot: string): void {
 
   const actions: any[] = [];
 
-  function resolveFunctionSignature(identifier: ts.Identifier): { name: string, signature: ts.Signature } | null {
+  let registryObjectLiteral: ts.ObjectLiteralExpression | null = null;
+  ts.forEachChild(sourceFile, node => {
+    if (ts.isVariableStatement(node)) {
+      node.declarationList.declarations.forEach(decl => {
+        if (
+          decl.name.getText() === 'actionRegistry' &&
+          decl.initializer &&
+          ts.isObjectLiteralExpression(decl.initializer)
+        ) {
+          registryObjectLiteral = decl.initializer;
+        }
+      });
+    }
+  });
+
+  if (!registryObjectLiteral) {
+    console.error("Could not find actionRegistry object literal in registry file.");
+    process.exit(1);
+  }
+
+  function resolveFunctionSignature(
+    identifier: ts.Identifier
+  ): { name: string; signature: ts.Signature } | null {
     const symbol = checker.getSymbolAtLocation(identifier);
     if (!symbol) return null;
-  
-    const targetSymbol = (symbol.flags & ts.SymbolFlags.Alias)
-      ? checker.getAliasedSymbol(symbol)
-      : symbol;
-  
+
+    const targetSymbol =
+      symbol.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(symbol)
+        : symbol;
+
     const declarations = targetSymbol.getDeclarations();
     if (!declarations || declarations.length === 0) return null;
-  
+
     const decl = declarations[0];
     const type = checker.getTypeOfSymbolAtLocation(targetSymbol, decl);
     const signatures = type.getCallSignatures();
     if (signatures.length === 0) return null;
-  
+
     return {
       name: identifier.text || targetSymbol.getName() || 'default',
       signature: signatures[0]
     };
   }
-  
 
   function extractParams(signature: ts.Signature): Record<string, any> {
     const params: Record<string, any> = {};
@@ -139,55 +161,49 @@ function generateActionsManifest(projectRoot: string): void {
       const decl = param.valueDeclaration ?? param.declarations?.[0];
       if (!decl) continue;
       const type = checker.getTypeOfSymbolAtLocation(param, decl);
-      params[paramName] = serializeType(type, checker, new Map(), new Set(), new Set());
+      params[paramName] = serializeType(
+        type,
+        checker,
+        new Map(),
+        new Set(),
+        new Set()
+      );
     }
     return params;
   }
 
-  ts.forEachChild(sourceFile, node => {
-    // Support for: export default actionRegistry;
-    if (ts.isExportAssignment(node)) {
-      const expr = node.expression;
-      if (!ts.isIdentifier(expr)) return;
+  const registryObj = registryObjectLiteral as ts.ObjectLiteralExpression;
+  for (const prop of registryObj.properties) {
+    if (!('name' in prop) || !prop.name) continue;
 
-      const symbol = checker.getSymbolAtLocation(expr);
-      if (!symbol || !symbol.valueDeclaration) return;
-
-      const decl = symbol.valueDeclaration;
-      if (!ts.isVariableDeclaration(decl) || !decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) return;
-
-      for (const prop of decl.initializer.properties) {
-        if (!('name' in prop) || !prop.name) continue;
-
-        let identifier: ts.Identifier | undefined;
-
-        if (ts.isShorthandPropertyAssignment(prop)) {
-          identifier = prop.name;
-        } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.initializer)) {
-          identifier = prop.initializer;
-        }
-
-        if (!identifier) continue;
-
-        const resolved = resolveFunctionSignature(identifier);
-        if (!resolved) continue;
-
-        const parameters = extractParams(resolved.signature);
-        actions.push({
-          name: prop.name.getText(),
-          description: `Execute ${prop.name.getText()}`,
-          parameters,
-          module: registryPath
-        });
-      }
+    let identifier: ts.Identifier | undefined;
+    if (ts.isShorthandPropertyAssignment(prop)) {
+      identifier = prop.name;
+    } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.initializer)) {
+      identifier = prop.initializer;
     }
-  });
+
+    if (!identifier) continue;
+
+    const resolved = resolveFunctionSignature(identifier);
+    if (!resolved) continue;
+
+    const parameters = extractParams(resolved.signature);
+    actions.push({
+      name: prop.name.getText(),
+      description: `Execute ${prop.name.getText()}`,
+      parameters,
+      module: registryPath
+    });
+  }
 
   const outPath = path.join(projectRoot, 'src/abra-actions/__generated__/actions.json');
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify({ actions }, null, 2));
-  console.log(`✅ Wrote actions.json based on actionRegistry.ts`);
+  console.log(`✅ Wrote actions.json based on actionRegistry.ts (${actions.length} action(s))`);
 }
+
+
 
 
 
