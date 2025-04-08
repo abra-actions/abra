@@ -132,7 +132,7 @@ function generateActionsManifest(projectRoot: string): void {
     process.exit(1);
   }
 
-  // Log the registry text to verify its content.
+  // Log the registry content
   console.log("Registry object literal text:", registryObjectLiteral);
 
   // Helper: Resolve a function signature from an identifier.
@@ -158,9 +158,12 @@ function generateActionsManifest(projectRoot: string): void {
 
     const decl = declarations[0];
     const type = checker.getTypeOfSymbolAtLocation(targetSymbol, decl);
+    // Log the type string for debugging.
+    console.log(`Type of '${identifier.text}':`, checker.typeToString(type));
+    
     const signatures = type.getCallSignatures();
     if (signatures.length === 0) {
-      console.log(`No call signatures for ${identifier.text}. Check that it is a function.`);
+      console.log(`No call signatures for ${identifier.text}. Check that it is declared as a function.`);
       return null;
     }
 
@@ -189,7 +192,7 @@ function generateActionsManifest(projectRoot: string): void {
     return params;
   }
 
-  // Process the properties found in the registry.
+  // Cast registryObjectLiteral to ObjectLiteralExpression for iteration.
   const registryObj = registryObjectLiteral as ts.ObjectLiteralExpression;
   for (const prop of registryObj.properties) {
     if (!('name' in prop) || !prop.name) continue;
@@ -223,12 +226,12 @@ function generateActionsManifest(projectRoot: string): void {
     });
   }
 
-  // Write out the actions.json with just the "actions" key.
   const outPath = path.join(projectRoot, 'src/abra-actions/__generated__/actions.json');
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify({ actions }, null, 2));
   console.log(`✅ Wrote actions.json based on actionRegistry.ts (${actions.length} action(s))`);
 }
+
 
 
 function writeActionRegistry(_: any, root: string): void {
