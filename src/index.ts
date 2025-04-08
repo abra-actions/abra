@@ -132,7 +132,7 @@ function generateActionsManifest(projectRoot: string): void {
     process.exit(1);
   }
 
-  // Log the registry content
+  // Log the registry content.
   console.log("Registry object literal text:", registryObjectLiteral);
 
   // Helper: Resolve a function signature from an identifier.
@@ -144,12 +144,9 @@ function generateActionsManifest(projectRoot: string): void {
       console.log(`No symbol found for identifier ${identifier.text}`);
       return null;
     }
-
-    const targetSymbol =
-      symbol.flags & ts.SymbolFlags.Alias
-        ? checker.getAliasedSymbol(symbol)
-        : symbol;
-
+    const targetSymbol = (symbol.flags & ts.SymbolFlags.Alias)
+      ? checker.getAliasedSymbol(symbol)
+      : symbol;
     const declarations = targetSymbol.getDeclarations();
     if (!declarations || declarations.length === 0) {
       console.log(`No declarations for symbol ${identifier.text}`);
@@ -157,19 +154,33 @@ function generateActionsManifest(projectRoot: string): void {
     }
 
     const decl = declarations[0];
-    const type = checker.getTypeOfSymbolAtLocation(targetSymbol, decl);
-    // Log the type string for debugging.
-    console.log(`Type of '${identifier.text}':`, checker.typeToString(type));
-    
-    const signatures = type.getCallSignatures();
-    if (signatures.length === 0) {
-      console.log(`No call signatures for ${identifier.text}. Check that it is declared as a function.`);
+    let signature: ts.Signature | undefined;
+    // Check if the declaration is function‑like.
+    if (
+      ts.isFunctionDeclaration(decl) ||
+      ts.isMethodDeclaration(decl) ||
+      ts.isFunctionExpression(decl) ||
+      ts.isArrowFunction(decl)
+    ) {
+      signature = checker.getSignatureFromDeclaration(decl as ts.SignatureDeclaration);
+    } else {
+      // Fallback: use the type call signatures.
+      const type = checker.getTypeOfSymbolAtLocation(targetSymbol, decl);
+      signature = type.getCallSignatures()[0];
+    }
+
+    if (!signature) {
+      console.log(`No call signature found for ${identifier.text}`);
       return null;
     }
 
+    // Log the type string for debugging.
+    const type = checker.getTypeOfSymbolAtLocation(targetSymbol, decl);
+    console.log(`Type of '${identifier.text}':`, checker.typeToString(type));
+
     return {
       name: identifier.text || targetSymbol.getName() || 'default',
-      signature: signatures[0]
+      signature
     };
   }
 
@@ -192,13 +203,11 @@ function generateActionsManifest(projectRoot: string): void {
     return params;
   }
 
-  // Cast registryObjectLiteral to ObjectLiteralExpression for iteration.
+  // Process the properties of the registry object.
   const registryObj = registryObjectLiteral as ts.ObjectLiteralExpression;
   for (const prop of registryObj.properties) {
     if (!('name' in prop) || !prop.name) continue;
-
     console.log("Processing property:", prop.name.getText());
-
     let identifier: ts.Identifier | undefined;
     if (ts.isShorthandPropertyAssignment(prop)) {
       identifier = prop.name;
@@ -231,6 +240,7 @@ function generateActionsManifest(projectRoot: string): void {
   fs.writeFileSync(outPath, JSON.stringify({ actions }, null, 2));
   console.log(`✅ Wrote actions.json based on actionRegistry.ts (${actions.length} action(s))`);
 }
+
 
 
 
