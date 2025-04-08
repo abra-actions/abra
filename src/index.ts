@@ -4,10 +4,6 @@ import * as ts from 'typescript';
 import fs from 'fs';
 import path from 'path';
 
-/* --------------------------------------------------------------------
-   serializeType:
-   Given a TS Type, convert it to a simple JSON-friendly structure.
--------------------------------------------------------------------- */
 function serializeType(
   type: ts.Type,
   typeChecker: ts.TypeChecker,
@@ -15,7 +11,6 @@ function serializeType(
   processedTypes: Set<string>,
   visited: Set<string>
 ): any {
-  // Handle literal types first.
   if (type.flags & ts.TypeFlags.StringLiteral) {
     return (type as ts.StringLiteralType).value;
   }
@@ -23,11 +18,9 @@ function serializeType(
     return (type as ts.NumberLiteralType).value;
   }
   if (type.flags & ts.TypeFlags.BooleanLiteral) {
-    // Cast to any to access intrinsicName since ts.IntrinsicType doesn't exist in your TS.
     return (type as any).intrinsicName === 'true';
   }
 
-  // Handle primitive types.
   if (type.flags & ts.TypeFlags.String) return "string";
   if (type.flags & ts.TypeFlags.Number) return "number";
   if (type.flags & ts.TypeFlags.Boolean) return "boolean";
@@ -35,7 +28,6 @@ function serializeType(
   if (type.flags & ts.TypeFlags.Undefined) return "undefined";
   if (type.flags & ts.TypeFlags.Any || type.flags & ts.TypeFlags.Unknown) return "any";
 
-  // If the type has a symbol and it's not a built-in type, try to serialize its structure.
   if (type.symbol && type.symbol.name && !isBuiltInType(type.symbol.name)) {
     const typeName = type.symbol.name;
     const typeInfo = Array.from(typeDefinitions.values()).find(t => t.name === typeName);
@@ -44,7 +36,6 @@ function serializeType(
       const props = typeInfo.type.getProperties();
       const structure: Record<string, any> = {};
       for (const prop of props) {
-        // Skip internal or method properties.
         if (prop.getName().startsWith('__') || isLikelyMethod(prop, typeChecker)) continue;
         const dec = prop.valueDeclaration || (prop.declarations ? prop.declarations[0] : undefined);
         if (!dec) continue;
@@ -55,7 +46,6 @@ function serializeType(
     }
   }
 
-  // Handle union types.
   if (type.flags & ts.TypeFlags.Union) {
     const unionType = type as ts.UnionType;
     const types = unionType.types.map(t => serializeType(t, typeChecker, typeDefinitions, processedTypes, new Set(visited)));
@@ -64,13 +54,11 @@ function serializeType(
     return "any";
   }
 
-  // Handle array types.
   if (typeChecker.isArrayType(type as ts.TypeReference)) {
     const elementType = typeChecker.getTypeArguments(type as ts.TypeReference)[0];
     return { type: "array", items: serializeType(elementType, typeChecker, typeDefinitions, processedTypes, new Set(visited)) };
   }
 
-  // Fallback: if the type has properties, serialize them.
   const props = type.getProperties ? type.getProperties() : [];
   if (!props.length) return typeChecker.typeToString(type);
 
@@ -83,46 +71,44 @@ function serializeType(
   return result;
 }
 
-/* --------------------------------------------------------------------
-   isBuiltInType:
-   Checks if a type name is one of the built-in types.
--------------------------------------------------------------------- */
 function isBuiltInType(name: string): boolean {
   return ['Array', 'String', 'Number', 'Boolean', 'Object', 'Function', 'Promise', 'Date', 'RegExp', 'Error', 'Map', 'Set', 'Symbol'].includes(name);
 }
 
-/* --------------------------------------------------------------------
-   isLikelyMethod:
-   Determines if a symbol represents a callable method.
--------------------------------------------------------------------- */
+
 function isLikelyMethod(symbol: ts.Symbol, checker: ts.TypeChecker): boolean {
   if (!symbol.valueDeclaration) return false;
   const t = checker.getTypeOfSymbol(symbol);
   return t.getCallSignatures()?.length > 0;
 }
 
-/* --------------------------------------------------------------------
-   generateActionsManifest:
-   Reads the manually maintained actionRegistry.ts (at a known path)
-   and builds actions.json from the registered functions.
--------------------------------------------------------------------- */
-function generateActionsManifest(projectRoot: string): void {
-  const registryPath = path.join(projectRoot, 'src/abra-actions/__generated__/actionRegistry.ts');
-  if (!fs.existsSync(registryPath)) {
-    console.error(`Registry file not found at ${registryPath}. Please run 'abra-actions init' first.`);
-    process.exit(1);
+function getAllTSFiles(dir: string, fileList: string[] = []): string[] {
+  const files = fs.readdirSync(dir);
+  for (const file of files) {
+    const fullPath = path.join(dir, file);
+    if (fs.statSync(fullPath).isDirectory()) {
+      getAllTSFiles(fullPath, fileList);
+    } else if (file.endsWith('.ts') && !file.endsWith('.d.ts')) {
+      fileList.push(fullPath);
+    }
   }
+  return fileList;
+}
 
-  const program = ts.createProgram([registryPath], { allowJs: false });
+function generateActionsManifest(projectRoot: string): void {
+  const allFiles = getAllTSFiles(path.join(projectRoot, 'src'));
+  const program = ts.createProgram(allFiles, { allowJs: false });
   const checker = program.getTypeChecker();
+  
+  const registryPath = path.join(projectRoot, 'src/abra-actions/__generated__/actionRegistry.ts');
   const sourceFile = program.getSourceFile(registryPath);
   if (!sourceFile) {
     console.error(`Could not read source file from ${registryPath}`);
     process.exit(1);
   }
-
+  
   const actions: any[] = [];
-  // Walk the AST to find the exported variable "actionRegistry"
+  
   ts.forEachChild(sourceFile, node => {
     if (ts.isVariableStatement(node)) {
       const isExported = node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword);
@@ -130,7 +116,6 @@ function generateActionsManifest(projectRoot: string): void {
 
       for (const declaration of node.declarationList.declarations) {
         if (declaration.name.getText() === 'actionRegistry' && declaration.initializer && ts.isObjectLiteralExpression(declaration.initializer)) {
-          // Iterate over properties inside the registry object.
           declaration.initializer.properties.forEach(prop => {
             if (ts.isShorthandPropertyAssignment(prop) || ts.isPropertyAssignment(prop)) {
               const key = prop.name.getText();
@@ -174,11 +159,6 @@ function generateActionsManifest(projectRoot: string): void {
   console.log(`✅ Wrote actions.json based on actionRegistry.ts`);
 }
 
-/* --------------------------------------------------------------------
-   writeActionRegistry:
-   Generates a scaffold file (empty registry) for developers to manually
-   import and register their functions.
--------------------------------------------------------------------- */
 function writeActionRegistry(_: any, root: string): void {
   const out = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
 // Import your functions below and register them
