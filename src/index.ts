@@ -96,10 +96,12 @@ function getAllTSFiles(dir: string, fileList: string[] = []): string[] {
 }
 
 function generateActionsManifest(projectRoot: string): void {
+  // Collect all .ts files in the src folder.
   const allFiles = getAllTSFiles(path.join(projectRoot, 'src'));
   const program = ts.createProgram(allFiles, { allowJs: false });
   const checker = program.getTypeChecker();
 
+  // Load the registry file.
   const registryPath = path.join(projectRoot, 'src/abra-actions/__generated__/actionRegistry.ts');
   const sourceFile = program.getSourceFile(registryPath);
   if (!sourceFile) {
@@ -109,6 +111,7 @@ function generateActionsManifest(projectRoot: string): void {
 
   const actions: any[] = [];
 
+  // Find the variable declaration for "actionRegistry".
   let registryObjectLiteral: ts.ObjectLiteralExpression | null = null;
   ts.forEachChild(sourceFile, node => {
     if (ts.isVariableStatement(node)) {
@@ -129,11 +132,18 @@ function generateActionsManifest(projectRoot: string): void {
     process.exit(1);
   }
 
+  // Log the registry text to verify its content.
+  console.log("Registry object literal text:", registryObjectLiteral);
+
+  // Helper: Resolve a function signature from an identifier.
   function resolveFunctionSignature(
     identifier: ts.Identifier
   ): { name: string; signature: ts.Signature } | null {
     const symbol = checker.getSymbolAtLocation(identifier);
-    if (!symbol) return null;
+    if (!symbol) {
+      console.log(`No symbol found for identifier ${identifier.text}`);
+      return null;
+    }
 
     const targetSymbol =
       symbol.flags & ts.SymbolFlags.Alias
@@ -141,12 +151,18 @@ function generateActionsManifest(projectRoot: string): void {
         : symbol;
 
     const declarations = targetSymbol.getDeclarations();
-    if (!declarations || declarations.length === 0) return null;
+    if (!declarations || declarations.length === 0) {
+      console.log(`No declarations for symbol ${identifier.text}`);
+      return null;
+    }
 
     const decl = declarations[0];
     const type = checker.getTypeOfSymbolAtLocation(targetSymbol, decl);
     const signatures = type.getCallSignatures();
-    if (signatures.length === 0) return null;
+    if (signatures.length === 0) {
+      console.log(`No call signatures for ${identifier.text}. Check that it is a function.`);
+      return null;
+    }
 
     return {
       name: identifier.text || targetSymbol.getName() || 'default',
@@ -154,6 +170,7 @@ function generateActionsManifest(projectRoot: string): void {
     };
   }
 
+  // Helper: Extract parameter info from a signature.
   function extractParams(signature: ts.Signature): Record<string, any> {
     const params: Record<string, any> = {};
     for (const param of signature.getParameters()) {
@@ -172,9 +189,12 @@ function generateActionsManifest(projectRoot: string): void {
     return params;
   }
 
+  // Process the properties found in the registry.
   const registryObj = registryObjectLiteral as ts.ObjectLiteralExpression;
   for (const prop of registryObj.properties) {
     if (!('name' in prop) || !prop.name) continue;
+
+    console.log("Processing property:", prop.name.getText());
 
     let identifier: ts.Identifier | undefined;
     if (ts.isShorthandPropertyAssignment(prop)) {
@@ -183,10 +203,16 @@ function generateActionsManifest(projectRoot: string): void {
       identifier = prop.initializer;
     }
 
-    if (!identifier) continue;
+    if (!identifier) {
+      console.log("No identifier for property", prop.getText());
+      continue;
+    }
 
     const resolved = resolveFunctionSignature(identifier);
-    if (!resolved) continue;
+    if (!resolved) {
+      console.log(`Could not resolve function signature for ${identifier.text}`);
+      continue;
+    }
 
     const parameters = extractParams(resolved.signature);
     actions.push({
@@ -197,14 +223,12 @@ function generateActionsManifest(projectRoot: string): void {
     });
   }
 
+  // Write out the actions.json with just the "actions" key.
   const outPath = path.join(projectRoot, 'src/abra-actions/__generated__/actions.json');
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify({ actions }, null, 2));
   console.log(`✅ Wrote actions.json based on actionRegistry.ts (${actions.length} action(s))`);
 }
-
-
-
 
 
 function writeActionRegistry(_: any, root: string): void {
