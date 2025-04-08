@@ -112,21 +112,25 @@ function generateActionsManifest(projectRoot: string): void {
   function resolveFunctionSignature(identifier: ts.Identifier): { name: string, signature: ts.Signature } | null {
     const symbol = checker.getSymbolAtLocation(identifier);
     if (!symbol) return null;
-
-    const aliased = checker.getAliasedSymbol(symbol);
-    const declarations = aliased.getDeclarations();
+  
+    const targetSymbol = (symbol.flags & ts.SymbolFlags.Alias)
+      ? checker.getAliasedSymbol(symbol)
+      : symbol;
+  
+    const declarations = targetSymbol.getDeclarations();
     if (!declarations || declarations.length === 0) return null;
-
+  
     const decl = declarations[0];
-    const type = checker.getTypeOfSymbolAtLocation(aliased, decl);
+    const type = checker.getTypeOfSymbolAtLocation(targetSymbol, decl);
     const signatures = type.getCallSignatures();
     if (signatures.length === 0) return null;
-
+  
     return {
-      name: identifier.text || aliased.getName() || 'default',
+      name: identifier.text || targetSymbol.getName() || 'default',
       signature: signatures[0]
     };
   }
+  
 
   function extractParams(signature: ts.Signature): Record<string, any> {
     const params: Record<string, any> = {};
