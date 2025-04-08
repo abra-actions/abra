@@ -99,70 +99,93 @@ function generateActionsManifest(projectRoot: string): void {
   const allFiles = getAllTSFiles(path.join(projectRoot, 'src'));
   const program = ts.createProgram(allFiles, { allowJs: false });
   const checker = program.getTypeChecker();
-  
+
   const registryPath = path.join(projectRoot, 'src/abra-actions/__generated__/actionRegistry.ts');
   const sourceFile = program.getSourceFile(registryPath);
   if (!sourceFile) {
     console.error(`Could not read source file from ${registryPath}`);
     process.exit(1);
   }
-  
+
   const actions: any[] = [];
-  
+
+  function resolveFunctionSignature(identifier: ts.Identifier): { name: string, signature: ts.Signature } | null {
+    const symbol = checker.getSymbolAtLocation(identifier);
+    if (!symbol) return null;
+
+    const aliased = checker.getAliasedSymbol(symbol);
+    const declarations = aliased.getDeclarations();
+    if (!declarations || declarations.length === 0) return null;
+
+    const decl = declarations[0];
+    const type = checker.getTypeOfSymbolAtLocation(aliased, decl);
+    const signatures = type.getCallSignatures();
+    if (signatures.length === 0) return null;
+
+    return {
+      name: identifier.text || aliased.getName() || 'default',
+      signature: signatures[0]
+    };
+  }
+
+  function extractParams(signature: ts.Signature): Record<string, any> {
+    const params: Record<string, any> = {};
+    for (const param of signature.getParameters()) {
+      const paramName = param.getName();
+      const decl = param.valueDeclaration ?? param.declarations?.[0];
+      if (!decl) continue;
+      const type = checker.getTypeOfSymbolAtLocation(param, decl);
+      params[paramName] = serializeType(type, checker, new Map(), new Set(), new Set());
+    }
+    return params;
+  }
+
   ts.forEachChild(sourceFile, node => {
+    // Support for: export default actionRegistry;
     if (ts.isExportAssignment(node)) {
       const expr = node.expression;
-      if (ts.isIdentifier(expr) && expr.escapedText === 'actionRegistry') {
-        const symbol = checker.getSymbolAtLocation(expr);
-        if (!symbol || !symbol.valueDeclaration) return;
-  
-        const decl = symbol.valueDeclaration;
-        if (ts.isVariableDeclaration(decl) && decl.initializer && ts.isObjectLiteralExpression(decl.initializer)) {
-          decl.initializer.properties.forEach(prop => {
-            if (ts.isShorthandPropertyAssignment(prop) || ts.isPropertyAssignment(prop)) {
-              const key = prop.name.getText();
-              let fnType: ts.Type;
-              if (ts.isPropertyAssignment(prop)) {
-                fnType = checker.getTypeAtLocation(prop.initializer);
-              } else {
-                const symbol = checker.getSymbolAtLocation(prop.name);
-                if (!symbol || !symbol.valueDeclaration) return;
-                fnType = checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration);
-              }
-  
-              const signatures = fnType.getCallSignatures();
-              const params: Record<string, any> = {};
-              if (signatures.length > 0) {
-                const sig = signatures[0];
-                for (const param of sig.getParameters()) {
-                  const paramName = param.getName();
-                  const paramDecl = param.valueDeclaration ?? param.declarations?.[0];
-                  if (!paramDecl) continue;
-                  const paramType = checker.getTypeOfSymbolAtLocation(param, paramDecl);
-                  params[paramName] = serializeType(paramType, checker, new Map(), new Set(), new Set());
-                }
-              }
-  
-              actions.push({
-                name: key,
-                description: `Execute ${key}`,
-                parameters: params,
-                module: registryPath
-              });
-            }
-          });
+      if (!ts.isIdentifier(expr)) return;
+
+      const symbol = checker.getSymbolAtLocation(expr);
+      if (!symbol || !symbol.valueDeclaration) return;
+
+      const decl = symbol.valueDeclaration;
+      if (!ts.isVariableDeclaration(decl) || !decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) return;
+
+      for (const prop of decl.initializer.properties) {
+        if (!('name' in prop) || !prop.name) continue;
+
+        let identifier: ts.Identifier | undefined;
+
+        if (ts.isShorthandPropertyAssignment(prop)) {
+          identifier = prop.name;
+        } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.initializer)) {
+          identifier = prop.initializer;
         }
+
+        if (!identifier) continue;
+
+        const resolved = resolveFunctionSignature(identifier);
+        if (!resolved) continue;
+
+        const parameters = extractParams(resolved.signature);
+        actions.push({
+          name: prop.name.getText(),
+          description: `Execute ${prop.name.getText()}`,
+          parameters,
+          module: registryPath
+        });
       }
     }
   });
-  
 
-  const out = { actions, typeAliases: {} };
   const outPath = path.join(projectRoot, 'src/abra-actions/__generated__/actions.json');
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, JSON.stringify(out, null, 2));
+  fs.writeFileSync(outPath, JSON.stringify({ actions }, null, 2));
   console.log(`✅ Wrote actions.json based on actionRegistry.ts`);
 }
+
+
 
 function writeActionRegistry(_: any, root: string): void {
   const out = `// AUTO-GENERATED BY ABRA CLI — DO NOT EDIT MANUALLY
