@@ -110,13 +110,15 @@ function generateActionsManifest(projectRoot: string): void {
   const actions: any[] = [];
   
   ts.forEachChild(sourceFile, node => {
-    if (ts.isVariableStatement(node)) {
-      const isExported = node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword);
-      if (!isExported) return;
-
-      for (const declaration of node.declarationList.declarations) {
-        if (declaration.name.getText() === 'actionRegistry' && declaration.initializer && ts.isObjectLiteralExpression(declaration.initializer)) {
-          declaration.initializer.properties.forEach(prop => {
+    if (ts.isExportAssignment(node)) {
+      const expr = node.expression;
+      if (ts.isIdentifier(expr) && expr.escapedText === 'actionRegistry') {
+        const symbol = checker.getSymbolAtLocation(expr);
+        if (!symbol || !symbol.valueDeclaration) return;
+  
+        const decl = symbol.valueDeclaration;
+        if (ts.isVariableDeclaration(decl) && decl.initializer && ts.isObjectLiteralExpression(decl.initializer)) {
+          decl.initializer.properties.forEach(prop => {
             if (ts.isShorthandPropertyAssignment(prop) || ts.isPropertyAssignment(prop)) {
               const key = prop.name.getText();
               let fnType: ts.Type;
@@ -127,18 +129,20 @@ function generateActionsManifest(projectRoot: string): void {
                 if (!symbol || !symbol.valueDeclaration) return;
                 fnType = checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration);
               }
+  
               const signatures = fnType.getCallSignatures();
-              let params: Record<string, any> = {};
+              const params: Record<string, any> = {};
               if (signatures.length > 0) {
                 const sig = signatures[0];
                 for (const param of sig.getParameters()) {
                   const paramName = param.getName();
-                  const paramDecl = param.valueDeclaration ?? (param.declarations ? param.declarations[0] : undefined);
+                  const paramDecl = param.valueDeclaration ?? param.declarations?.[0];
                   if (!paramDecl) continue;
                   const paramType = checker.getTypeOfSymbolAtLocation(param, paramDecl);
                   params[paramName] = serializeType(paramType, checker, new Map(), new Set(), new Set());
                 }
               }
+  
               actions.push({
                 name: key,
                 description: `Execute ${key}`,
@@ -151,6 +155,7 @@ function generateActionsManifest(projectRoot: string): void {
       }
     }
   });
+  
 
   const out = { actions, typeAliases: {} };
   const outPath = path.join(projectRoot, 'src/abra-actions/__generated__/actions.json');
