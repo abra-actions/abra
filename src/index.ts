@@ -155,7 +155,7 @@ function generateActionsManifest(projectRoot: string): void {
     }
 
     let signature: ts.Signature | undefined = undefined;
-    // Try each declaration: if it is a function-like node, use its signature.
+    // Try each declaration if it's function‑like.
     for (const d of declarations) {
       if (
         ts.isFunctionDeclaration(d) ||
@@ -176,8 +176,6 @@ function generateActionsManifest(projectRoot: string): void {
       console.log(`No call signature found for ${identifier.text}`);
       return null;
     }
-
-    // Log the type string for debugging.
     console.log(`Type of '${identifier.text}':`, checker.typeToString(checker.getTypeOfSymbolAtLocation(targetSymbol, declarations[0])));
     return {
       name: identifier.text || targetSymbol.getName() || 'default',
@@ -189,11 +187,21 @@ function generateActionsManifest(projectRoot: string): void {
   function extractParams(signature: ts.Signature): Record<string, any> {
     const params: Record<string, any> = {};
     for (const param of signature.getParameters()) {
-      const paramName = param.getName();
       const decl = param.valueDeclaration ?? param.declarations?.[0];
       if (!decl) continue;
       const type = checker.getTypeOfSymbolAtLocation(param, decl);
-      params[paramName] = serializeType(type, checker, new Map(), new Set(), new Set());
+      const serialized = serializeType(type, checker, new Map(), new Set(), new Set());
+      
+      // If the parameter is declared using a destructuring pattern,
+      // merge its properties instead of using its auto-generated name.
+      if (ts.isObjectBindingPattern(decl)) {
+        if (serialized && typeof serialized === "object") {
+          Object.assign(params, serialized);
+        }
+      } else {
+        const paramName = param.getName();
+        params[paramName] = serialized;
+      }
     }
     return params;
   }
@@ -210,33 +218,28 @@ function generateActionsManifest(projectRoot: string): void {
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.initializer)) {
       identifier = prop.initializer;
     }
-
     if (!identifier) {
       console.log("No identifier for property", prop.getText());
       continue;
     }
-
     const resolved = resolveFunctionSignature(identifier);
     if (!resolved) {
       console.log(`Could not resolve function signature for ${identifier.text}`);
       continue;
     }
-
     const parameters = extractParams(resolved.signature);
     actions.push({
       name: prop.name.getText(),
-      description: `Execute ${prop.name.getText()}`,
-      parameters,
-      module: registryPath
+      parameters
     });
   }
 
   const outPath = path.join(projectRoot, 'src/abra-actions/__generated__/actions.json');
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  // Write only the actions key.
   fs.writeFileSync(outPath, JSON.stringify({ actions }, null, 2));
   console.log(`✅ Wrote actions.json based on actionRegistry.ts (${actions.length} action(s))`);
 }
+
 
 
 
