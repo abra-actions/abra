@@ -96,108 +96,67 @@ function getAllTSFiles(dir: string, fileList: string[] = []): string[] {
 }
 
 function generateActionsManifest(projectRoot: string): void {
-  // Collect all .ts files in the src folder.
   const allFiles = getAllTSFiles(path.join(projectRoot, 'src'));
   const program = ts.createProgram(allFiles, { allowJs: false });
   const checker = program.getTypeChecker();
-
-  // Load the registry file.
   const registryPath = path.join(projectRoot, 'src/abra-actions/__generated__/actionRegistry.ts');
   const sourceFile = program.getSourceFile(registryPath);
   if (!sourceFile) {
     console.error(`Could not read source file from ${registryPath}`);
     process.exit(1);
   }
-
   const actions: any[] = [];
-
-  // Find the variable declaration for "actionRegistry".
   let registryObjectLiteral: ts.ObjectLiteralExpression | null = null;
   ts.forEachChild(sourceFile, node => {
     if (ts.isVariableStatement(node)) {
       node.declarationList.declarations.forEach(decl => {
-        if (
-          decl.name.getText() === 'actionRegistry' &&
-          decl.initializer &&
-          ts.isObjectLiteralExpression(decl.initializer)
-        ) {
+        if (decl.name.getText() === 'actionRegistry' && decl.initializer && ts.isObjectLiteralExpression(decl.initializer)) {
           registryObjectLiteral = decl.initializer;
         }
       });
     }
   });
-
   if (!registryObjectLiteral) {
     console.error("Could not find actionRegistry object literal in registry file.");
     process.exit(1);
   }
-
-  console.log("Registry object literal text:", registryObjectLiteral);
-
-  // Helper: Resolve a function signature from an identifier.
-  function resolveFunctionSignature(
-    identifier: ts.Identifier
-  ): { name: string; signature: ts.Signature } | null {
+  function resolveFunctionSignature(identifier: ts.Identifier): { name: string; signature: ts.Signature } | null {
     const symbol = checker.getSymbolAtLocation(identifier);
     if (!symbol) {
-      console.log(`No symbol found for identifier ${identifier.text}`);
       return null;
     }
-
-    const targetSymbol = (symbol.flags & ts.SymbolFlags.Alias)
-      ? checker.getAliasedSymbol(symbol)
-      : symbol;
-
+    const targetSymbol = (symbol.flags & ts.SymbolFlags.Alias) ? checker.getAliasedSymbol(symbol) : symbol;
     const declarations = targetSymbol.getDeclarations();
     if (!declarations || declarations.length === 0) {
-      console.log(`No declarations for symbol ${identifier.text}`);
       return null;
     }
-
     let signature: ts.Signature | undefined = undefined;
-    // Try each declaration if it's function‑like.
     for (const d of declarations) {
-      if (
-        ts.isFunctionDeclaration(d) ||
-        ts.isFunctionExpression(d) ||
-        ts.isArrowFunction(d) ||
-        ts.isMethodDeclaration(d)
-      ) {
+      if (ts.isFunctionDeclaration(d) || ts.isFunctionExpression(d) || ts.isArrowFunction(d) || ts.isMethodDeclaration(d)) {
         signature = checker.getSignatureFromDeclaration(d as ts.SignatureDeclaration);
         if (signature) break;
       }
     }
     if (!signature) {
-      // Fallback: use the type's call signatures.
       const type = checker.getTypeOfSymbolAtLocation(targetSymbol, declarations[0]);
       signature = type.getCallSignatures()[0];
     }
     if (!signature) {
-      console.log(`No call signature found for ${identifier.text}`);
       return null;
     }
     console.log(`Type of '${identifier.text}':`, checker.typeToString(checker.getTypeOfSymbolAtLocation(targetSymbol, declarations[0])));
-    return {
-      name: identifier.text || targetSymbol.getName() || 'default',
-      signature
-    };
+    return { name: identifier.text || targetSymbol.getName() || 'default', signature };
   }
-
-  // Helper: Extract parameter info from a signature.
   function extractParams(signature: ts.Signature): Record<string, any> {
     const params: Record<string, any> = {};
     for (const param of signature.getParameters()) {
-      const decl = param.valueDeclaration ?? param.declarations?.[0];
+      const decl = param.declarations?.[0];
       if (!decl) continue;
       const type = checker.getTypeOfSymbolAtLocation(param, decl);
       const serialized = serializeType(type, checker, new Map(), new Set(), new Set());
-      
-      // If the parameter is declared using a destructuring pattern,
-      // merge its properties instead of using its auto-generated name.
-      if (ts.isObjectBindingPattern(decl)) {
-        if (serialized && typeof serialized === "object") {
-          Object.assign(params, serialized);
-        }
+      const bindingName = (decl as any).name;
+      if (bindingName && ts.isObjectBindingPattern(bindingName) && serialized && typeof serialized === "object") {
+        Object.assign(params, serialized);
       } else {
         const paramName = param.getName();
         params[paramName] = serialized;
@@ -205,13 +164,10 @@ function generateActionsManifest(projectRoot: string): void {
     }
     return params;
   }
-
-  // Process each property in the registry object literal.
   const registryObj = registryObjectLiteral as ts.ObjectLiteralExpression;
   for (const prop of registryObj.properties) {
     if (!('name' in prop) || !prop.name) continue;
     console.log("Processing property:", prop.name.getText());
-
     let identifier: ts.Identifier | undefined;
     if (ts.isShorthandPropertyAssignment(prop)) {
       identifier = prop.name;
@@ -228,19 +184,13 @@ function generateActionsManifest(projectRoot: string): void {
       continue;
     }
     const parameters = extractParams(resolved.signature);
-    actions.push({
-      name: prop.name.getText(),
-      parameters
-    });
+    actions.push({ name: prop.name.getText(), parameters });
   }
-
   const outPath = path.join(projectRoot, 'src/abra-actions/__generated__/actions.json');
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify({ actions }, null, 2));
   console.log(`✅ Wrote actions.json based on actionRegistry.ts (${actions.length} action(s))`);
 }
-
-
 
 
 function writeActionRegistry(_: any, root: string): void {
