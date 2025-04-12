@@ -7,7 +7,7 @@
     "abra-actions": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc && node scripts/attachShebang.js"
+    "build": "tsc && node scripts/attachShebang.cjs"
   },
   "files": [
     "dist"
