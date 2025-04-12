@@ -8,5 +8,6 @@ export default defineConfig({
   bundle: true,
   clean: true,
   platform: 'node',
+  noExternal: ['typescript']
 });
 
