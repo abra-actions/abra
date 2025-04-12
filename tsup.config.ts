@@ -1,13 +1,13 @@
+// tsup.config.ts
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  format: ['cjs'], 
+  format: ['cjs'],                
+  bundle: true,                   
+  noExternal: ['typescript'],     
+  platform: 'node',
   target: 'node18',
   outDir: 'dist',
-  bundle: true,
-  clean: true,
-  platform: 'node',
-  noExternal: ['typescript']
+  clean: true
 });
-
