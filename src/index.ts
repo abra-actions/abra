@@ -241,7 +241,7 @@ import actionsJson from './__generated__/actions.json';
 import { executeAction } from './__generated__/abra-executor.ts';
 import './AbraAssistant.css';
 
-const BACKEND_URL = "http://localhost:4000";
+const BACKEND_URL = "https://localhost:4000;
 
 type AssistantState = {
   expanded: boolean;
@@ -253,10 +253,11 @@ type AssistantState = {
   isProcessing: boolean;
   processingStep: number;
   showSuccess: boolean;
+  previousContext: { action: string, params: Record<string, any> } | null;
 };
 
 const AbraAssistant = () => {
-  const [state, setState] = useState({
+  const [state, setState] = useState<AssistantState>({
     expanded: false,
     input: '',
     status: '',
@@ -265,11 +266,12 @@ const AbraAssistant = () => {
     isLoading: false,
     isProcessing: false,
     processingStep: 0,
-    showSuccess: false
+    showSuccess: false,
+    previousContext: null,
   });
 
-  const textInputRef = useRef(null);
-  const contentRef = useRef(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const processingSteps = [
     "Analyzing your request",
@@ -354,14 +356,14 @@ const AbraAssistant = () => {
     updateState({ expanded: !state.expanded });
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     updateState({ input: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!state.input.trim() || state.isLoading) return;
-
+  
     updateState({
       isLoading: true,
       isProcessing: true,
@@ -369,27 +371,47 @@ const AbraAssistant = () => {
       result: null,
       error: null
     });
-    
+  
     try {
       const res = await fetch(\`\${BACKEND_URL}/api/resolve-action\`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userIntent: state.input, 
-          actions: actionsJson.actions 
+          actions: actionsJson.actions,
+          previousContext: state.previousContext
         })
       });
-      
+  
       const aiResponse = await res.json();
+  
+      if (aiResponse.followup) {
+        updateState({
+          status: aiResponse.followup.message,
+          previousContext: {
+            action: aiResponse.action,
+            params: { 
+              ...state.previousContext?.params 
+            }
+          },
+          input: '',
+          isLoading: false,
+          isProcessing: false,
+        });
+        return;
+      }
+  
       const executionResult = await executeAction(aiResponse.action, aiResponse.params);
-      
+  
       if (executionResult.success) {
         updateState({
           result: executionResult.result,
           status: \`✅ Executed: \${aiResponse.action}\`,
+          input: '',
+          previousContext: null, 
           showSuccess: true
         });
-        
+  
         setTimeout(() => {
           updateState({ input: '' });
           textInputRef.current?.focus();
@@ -409,6 +431,7 @@ const AbraAssistant = () => {
       });
     }
   };
+  
 
   if (!state.expanded) {
     return (
@@ -449,9 +472,18 @@ const AbraAssistant = () => {
       </div>
       <div ref={contentRef} className="abra-content">
         <div className="abra-message-container">
-          <div className="abra-message">
-            I can execute functions in this application through natural language. What would you like to do?
-          </div>
+        <div className="abra-message">
+          <strong>Try Abra with some of our favorites:</strong>
+          <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
+            <li>Contact the team</li>
+            <li>Take me to the GitHub docs</li>
+            <li>Subscribe to mailing list</li>
+            <li>Tweet about Abra</li>
+            <li>Share this page with friends</li>
+            <li>Setup time</li>
+        </ul>
+      </div>
+
 
           {state.isProcessing && (
             <div className="abra-thinking-container">
@@ -483,10 +515,13 @@ const AbraAssistant = () => {
           )}
 
           {state.result && !state.error && (
-            <div className="abra-message result-message">
-              <pre>{JSON.stringify(state.result, null, 2)}</pre>
+            <div className="abra-message">
+              {typeof state.result === 'string'
+                ? state.result
+                : JSON.stringify(state.result, null, 2)}
             </div>
           )}
+
 
           {state.showSuccess && !state.error && (
             <div className="abra-success-message">
