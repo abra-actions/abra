@@ -241,7 +241,7 @@ import actionsJson from './__generated__/actions.json';
 import { executeAction } from './__generated__/abra-executor.ts';
 import './AbraAssistant.css';
 
-const BACKEND_URL = "https://localhost:4000;
+const BACKEND_URL = "https://abra-api-lwjc.onrender.com";
 
 type AssistantState = {
   expanded: boolean;
@@ -391,7 +391,8 @@ const AbraAssistant = () => {
           previousContext: {
             action: aiResponse.action,
             params: { 
-              ...state.previousContext?.params 
+              ...state.previousContext?.params,
+              ...aiResponse.params
             }
           },
           input: '',
