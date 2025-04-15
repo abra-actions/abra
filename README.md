@@ -1,18 +1,21 @@
-#
-
-# abra - AI-Powered Function Discovery and Execution
+# abra – AI-Powered Function Discovery and Execution
 
 ## 🚀 Overview
 
-**abra** is a TypeScript SDK that enables natural language interaction with your application's functions. By adding a simple `@abra-action` annotation to your TypeScript functions, users can interact with your application through natural language requests.
+**abra** is a TypeScript SDK that enables natural language interaction with your application's functions. Import the functions you'd like to expose into the action registry and run a single command to enable execution via natural language commands — all on your own infrastructure.
+
+---
 
 ## ✨ Features
 
-- **TypeScript Integration**: Automatically extracts type information from your annotated functions
-- **LLM-powered**: Uses OpenAI's GPT models to understand natural language requests
-- **Zero Boilerplate**: Just add an annotation to expose functions to abra
-- **Type Safety**: Validates and transforms user inputs according to your type definitions
-- **Plug-and-Play**: Easy to integrate with existing TypeScript projects
+- **TypeScript Integration** – Automatically extracts type information from your functions
+- **LLM-Powered** – Uses OpenAI's GPT models to understand user intent
+- **Zero Boilerplate** – Just import functions into the registry, no annotations or decorators
+- **Type Safety** – Validates and transforms user input based on your type definitions
+- **No Data Leakage** – Only function names and descriptions are sent to the LLM; your code and data stay private
+- **Executes Locally** – All actions are run through your code, on your infra, with your auth and security context
+
+---
 
 ## 🛠️ Installation
 
@@ -20,110 +23,82 @@
 npm install abra-actions
 ```
 
+---
+
 ## 🔗 Quick Start
 
-### 1. Annotate your functions
-
-```typescript
-/**
- * @abra-action Add products to the user's shopping cart
- */
-export function addToCart(params: {
-  productId: string;
-  quantity: number;
-  size?: "small" | "medium" | "large";
-  color?: string;
-}): Promise<{success: boolean; cartItems: number}> {
-  // Your implementation here
-  return Promise.resolve({success: true, cartItems: 5});
-}
-```
-
-### 2. Generate action definitions
+### 1. Initialize abra
 
 ```bash
-npx abra-actions
+npx abra-actions init
 ```
 
-This will scan your project for `@abra-action` annotations and generate an `actions.json` file.
+This command sets up the abra scaffold in your `/src` directory:
 
-### 3. Add the abra prompt to your UI
+- `actionRegistry.ts` – Import and register your callable functions here
+- `actions.json` – Generated manifest of all actions and types
+- `abra-executor.ts` – Lightweight wrapper to execute actions via the registry
 
-```jsx
-import { AbraActionPrompt } from '@abra/sdk';
+---
+
+### 2. Register your functions
+
+```ts
+// src/abra-actions/__generated__/actionRegistry.ts
+
+import { 
+  addToCart, 
+  searchProducts, 
+  filterProducts, 
+  sortProducts 
+} from './handlers';
+
+export const actionRegistry = {
+  addToCart,
+  searchProducts,
+  filterProducts,
+  sortProducts
+};
+```
+
+---
+
+### 3. Generate the actions
+
+```bash
+npx abra-actions generate
+```
+
+This command:
+- Populates `actions.json` with metadata about your functions
+- Infers parameter types
+- Updates the `abra-executor.ts` file for secure local execution
+
+---
+
+### 4. Use the assistant in your UI
+
+```tsx
+import { AbraAssistant } from '../abra-actions/AbraAssistant';
 
 function MyComponent() {
   return (
     <div>
       <h1>My App</h1>
-      <AbraActionPrompt />
+      <AbraAssistant />
     </div>
   );
 }
 ```
 
-## 📝 API Reference
-
-### @abra-action annotation
-
-Add this JSDoc annotation to any TypeScript function you want to expose to abra:
-
-```typescript
-/**
- * @abra-action Description of what this function does
- */
-```
-
-### AbraActionPrompt Component
-
-A React component that provides a chat-like interface for users to interact with your functions.
-
-```jsx
-<AbraActionPrompt />
-```
-
-### executeAction(actionName, params)
-
-Directly execute an action with the given parameters:
-
-```javascript
-import { executeAction } from '@abra/sdk';
-
-const result = await executeAction('addToCart', {
-  productId: '12345',
-  quantity: 2,
-  size: 'medium'
-});
-```
-
-## 🔧 Configuration
-
-Create an `abra.config.js` file in your project root:
-
-```javascript
-module.exports = {
-  // OpenAI API key (alternatively use OPENAI_API_KEY env variable)
-  apiKey: 'your-openai-api-key',
-  
-  // Directories to scan for @abra-action annotations
-  include: ['src/**/*.ts'],
-  
-  // Directories to exclude
-  exclude: ['node_modules', 'dist'],
-  
-  // Custom LLM configuration
-  llm: {
-    model: 'gpt-4', // or 'gpt-3.5-turbo'
-    temperature: 0.1,
-    max_tokens: 500
-  }
-};
-```
+---
 
 ## 📄 License
 
 MIT
 
+---
+
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a pull request.
