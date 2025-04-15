@@ -93,6 +93,59 @@ function MyComponent() {
 
 ---
 
+### 🧩 Using Abra via API (Custom Components)
+
+If you prefer to connect your own UI to Abra’s backend without using the built-in assistant, you can call the API directly and pass the result to `executeAction`.
+
+The API requires an environment variable:
+
+```bash
+REACT_APP_ABRA_API_KEY=your-key-here
+```
+
+---
+
+### ⚡ Minimal Example
+
+```tsx
+import { useState } from 'react';
+import { executeAction } from '../abra-actions/__generated__/abra-executor';
+import actions from '../abra-actions/__generated__/actions.json';
+
+const BACKEND_URL = 'https://api.abra-actions.com';
+
+export default function AbraInput() {
+  const [input, setInput] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const res = await fetch(`${BACKEND_URL}/api/resolve-action`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ABRA_PUBLIC_API_KEY,
+      },
+      body: JSON.stringify({ userIntent: input, actions }),
+    });
+
+    const { action, params } = await res.json();
+    await executeAction(action, params);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={input} onChange={e => setInput(e.target.value)} />
+      <button type="submit">Run</button>
+    </form>
+  );
+}
+```
+
+This gives you full control over the UI while still leveraging Abra’s core LLM routing and function execution.
+
+---
+
 ## 📄 License
 
 MIT
