@@ -112,7 +112,7 @@ import { useState } from 'react';
 import { executeAction } from '../abra-actions/__generated__/abra-executor';
 import actions from '../abra-actions/__generated__/actions.json';
 
-const BACKEND_URL = 'https://api.abra-actions.com';
+const BACKEND_URL = 'abra-api';
 
 export default function AbraInput() {
   const [input, setInput] = useState('');
