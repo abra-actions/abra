@@ -266,7 +266,7 @@ const AbraAssistant = () => {
     previousContext: null,
   });
 
-  const textInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const processingSteps = [
@@ -279,6 +279,22 @@ const AbraAssistant = () => {
   const updateState = (partialState: Partial<AssistantState>) => {
     setState(prev => ({ ...prev, ...partialState }));
   };
+
+  // Function to adjust input height based on content
+  const adjustInputHeight = () => {
+    if (textInputRef.current) {
+      textInputRef.current.style.height = 'auto';
+      const scrollHeight = textInputRef.current.scrollHeight;
+      // Set a maximum height (adjust as needed)
+      const maxHeight = 120;
+      textInputRef.current.style.height = \`\${Math.min(scrollHeight, maxHeight)}px\`;
+    }
+  };
+
+  useEffect(() => {
+    // Adjust input height whenever input changes
+    adjustInputHeight();
+  }, [state.input]);
 
   useEffect(() => {
     const adjustHeight = () => {
@@ -352,8 +368,17 @@ const AbraAssistant = () => {
     updateState({ expanded: !state.expanded });
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     updateState({ input: e.target.value });
+  };
+
+  // Handle key presses in the textarea
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit on Enter (without Shift key)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as unknown as React.FormEvent);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -403,14 +428,14 @@ const AbraAssistant = () => {
       if (executionResult.success) {
         updateState({
           result: executionResult.result,
-          status: \`✅ Executed: \${aiResponse.action}\`,
+          status: \`Successfully executed: \${aiResponse.action}\`,
           input: '',
           previousContext: null, 
           showSuccess: true
         });
   
         setTimeout(() => {
-          updateState({ input: '' });
+          updateState({ showSuccess: false });
           textInputRef.current?.focus();
         }, 4000);
       } else {
@@ -419,7 +444,7 @@ const AbraAssistant = () => {
     } catch (err: any) {
       updateState({
         error: err.message,
-        status: "Failed"
+        status: "Operation failed"
       });
     } finally {
       updateState({
@@ -429,17 +454,31 @@ const AbraAssistant = () => {
     }
   };
   
+  // Function to handle example clicks
+  const handleExampleClick = (example: string) => {
+    updateState({ input: example });
+    if (textInputRef.current) {
+      textInputRef.current.focus();
+    }
+  };
+
+  // Arrow icon component
+  const ArrowIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M12 5L19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
 
   if (!state.expanded) {
     return (
       <div className="abra-dock-container">
         <form onSubmit={handleSubmit} className="abra-dock-form">
           <input
-            ref={textInputRef}
             type="text"
             placeholder="Ask Abra anything..."
             value={state.input}
-            onChange={handleInputChange}
+            onChange={(e) => updateState({ input: e.target.value })}
             onFocus={toggleExpanded}
             className="abra-dock-input"
           />
@@ -448,7 +487,7 @@ const AbraAssistant = () => {
             className="abra-dock-send"
             disabled={state.isLoading || !state.input.trim()}
           >
-            ➤
+            <ArrowIcon />
           </button>
         </form>
       </div>
@@ -469,18 +508,26 @@ const AbraAssistant = () => {
       </div>
       <div ref={contentRef} className="abra-content">
         <div className="abra-message-container">
-        <div className="abra-message">
-          <strong>Try Abra with some of our favorites:</strong>
-          <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
-            <li>Contact the team</li>
-            <li>Take me to the GitHub docs</li>
-            <li>Subscribe to mailing list</li>
-            <li>Tweet about Abra</li>
-            <li>Share this page with friends</li>
-            <li>Setup time</li>
-        </ul>
-      </div>
-
+          <div className="abra-message">
+            <strong>Try Abra with some of our favorites:</strong>
+            <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
+              {[
+                "Contact the team",
+                "Take me to the GitHub docs",
+                "Subscribe to mailing list",
+                "Tweet about Abra",
+                "Share this page with friends",
+                "Setup time"
+              ].map((example, index) => (
+                <li 
+                  key={index} 
+                  onClick={() => handleExampleClick(example)}
+                >
+                  {example}
+                </li>
+              ))}
+            </ul>
+          </div>
 
           {state.isProcessing && (
             <div className="abra-thinking-container">
@@ -499,7 +546,7 @@ const AbraAssistant = () => {
             </div>
           )}
 
-          {state.status && !state.isProcessing && (
+          {state.status && !state.isProcessing && !state.error && !state.showSuccess && (
             <div className="abra-message">
               {state.status}
             </div>
@@ -519,23 +566,24 @@ const AbraAssistant = () => {
             </div>
           )}
 
-
           {state.showSuccess && !state.error && (
             <div className="abra-success-message">
-              ✅ Operation completed successfully
+              <div className="abra-success-icon">✓</div>
+              Operation completed successfully
             </div>
           )}
         </div>
 
         <form onSubmit={handleSubmit} className="abra-input-container">
-          <input
+          <textarea
             ref={textInputRef}
-            type="text"
             placeholder="Type what you want to do..."
             value={state.input}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             className="abra-input"
             readOnly={state.isLoading}
+            rows={1}
           />
           <button 
             type="submit" 
@@ -543,10 +591,7 @@ const AbraAssistant = () => {
             aria-label="Send message"
             disabled={state.isLoading || !state.input.trim()}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <ArrowIcon />
           </button>
         </form>
       </div>
@@ -554,8 +599,7 @@ const AbraAssistant = () => {
   );
 };
 
-export default AbraAssistant;
-`;
+export default AbraAssistant;`;
 
   const file = path.join(root, 'src/abra-actions/AbraAssistant.tsx');
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -565,16 +609,21 @@ export default AbraAssistant;
 
 function writeAssistantStyles(root: string): void {
   const file = path.join(root, 'src/abra-actions/AbraAssistant.css');
-  const content = `.abra-container {
+  const content = `/* Import Krona One font */
+@import url('https://fonts.googleapis.com/css2?family=Krona+One&display=swap');
+/* Import Inter font for consistent typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+.abra-container {
   position: fixed;
   bottom: 24px;
   right: 24px;
   width: 380px;
   max-width: calc(100% - 48px);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  background-color: rgba(18, 18, 18, 0.95);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(74, 229, 131, 0.15);
+  background-color: rgba(14, 14, 14, 0.95);
   backdrop-filter: blur(10px);
   overflow: hidden;
   z-index: 10000;
@@ -587,7 +636,7 @@ function writeAssistantStyles(root: string): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: rgba(18, 18, 18, 0.95);
+  background-color: rgba(14, 14, 14, 0.98);
 }
 
 .abra-title {
@@ -595,6 +644,8 @@ function writeAssistantStyles(root: string): void {
   color: #f0f0f0;
   font-size: 1.25rem;
   font-weight: 500;
+  font-family: 'Krona One', sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .abra-close-button {
@@ -604,17 +655,24 @@ function writeAssistantStyles(root: string): void {
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
 }
 
 .abra-close-button:hover {
-  color: #fff;
+  color: #4AE583;
 }
 
 .abra-content {
   padding: 16px;
-  background-color: #1a1a1a;
+  background-color: #111111;
   max-height: 60vh;
   overflow-y: auto;
+  transition: max-height 0.3s ease-out;
 }
 
 .abra-message-container {
@@ -622,19 +680,69 @@ function writeAssistantStyles(root: string): void {
 }
 
 .abra-message {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.03);
   color: #f0f0f0;
   padding: 12px 16px;
   border-radius: 8px;
   margin-bottom: 12px;
   font-size: 0.95rem;
   line-height: 1.5;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.abra-message strong {
+  color: #fff;
+  font-family: 'Krona One', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+}
+
+.abra-message ul {
+  margin-top: 10px;
+}
+
+.abra-message li {
+  margin-bottom: 6px;
+  color: #ccc;
+  position: relative;
+  transition: color 0.15s ease, transform 0.15s ease;
+  padding-left: 5px;
+}
+
+.abra-message li:hover {
+  color: #4AE583;
+  cursor: pointer;
+  transform: translateX(2px);
 }
 
 .error-message {
-  background-color: rgba(255, 82, 82, 0.1) !important;
-  border-left: 3px solid #ff5252;
-  color: #ff5252;
+  background: linear-gradient(135deg, rgba(255, 82, 82, 0.08) 0%, rgba(255, 82, 82, 0.02) 100%) !important;
+  border: none !important;
+  position: relative;
+  color: #ff8a8a !important;
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.15);
+  overflow: hidden;
+}
+
+.error-message::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, #ff5252, rgba(255, 82, 82, 0.5));
+}
+
+.error-message::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 82, 82, 0.5), transparent);
 }
 
 .result-message {
@@ -644,10 +752,14 @@ function writeAssistantStyles(root: string): void {
 
 .abra-thinking-container {
   margin: 12px 0;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .abra-thinking-step {
-  color: #ccc;
+  color: #aaa;
   font-size: 0.9rem;
   display: flex;
   align-items: center;
@@ -655,27 +767,70 @@ function writeAssistantStyles(root: string): void {
 }
 
 .abra-step-checkmark {
-  color: #25d366;
+  color: #4AE583;
   margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
 }
 
 .abra-loader {
-  border: 2px solid #333;
-  border-top: 2px solid #25d366;
+  border: 2px solid rgba(74, 229, 131, 0.1);
+  border-top: 2px solid #4AE583;
+  border-right: 2px solid #4AE583;
   border-radius: 50%;
-  width: 12px;
-  height: 12px;
-  animation: spin 1s linear infinite;
+  width: 14px;
+  height: 14px;
+  animation: spin 0.8s linear infinite;
   margin-right: 8px;
 }
 
 .abra-success-message {
-  background-color: rgba(37, 211, 102, 0.1);
-  border: 1px solid rgba(37, 211, 102, 0.3);
-  color: #25d366;
+  background: linear-gradient(135deg, rgba(74, 229, 131, 0.08) 0%, rgba(74, 229, 131, 0.02) 100%);
+  border: none;
+  color: #4AE583;
   border-radius: 8px;
-  padding: 12px;
+  padding: 16px;
   margin: 12px 0;
+  position: relative;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(74, 229, 131, 0.1);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.abra-success-message::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, #4AE583, rgba(74, 229, 131, 0.5));
+}
+
+.abra-success-message::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(74, 229, 131, 0.5), transparent);
+}
+
+.abra-success-icon {
+  margin-right: 8px;
+  width: 20px;
+  height: 20px;
+  background: rgba(74, 229, 131, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .abra-input-container {
@@ -686,17 +841,25 @@ function writeAssistantStyles(root: string): void {
 
 .abra-input {
   flex: 1;
-  padding: 10px 16px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background-color: rgba(26, 26, 26, 0.8);
+  padding: 12px 46px 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: rgba(20, 20, 20, 0.8);
   color: #f0f0f0;
   font-size: 0.95rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 46px;
+  height: auto;
+  max-height: 120px;
+  overflow-y: auto;
+  resize: none;
+  transition: border-color 0.2s ease, min-height 0.2s ease, box-shadow 0.2s ease;
 }
 
 .abra-input:focus {
   outline: none;
-  border-color: rgba(37, 211, 102, 0.5);
+  border-color: rgba(74, 229, 131, 0.5);
+  box-shadow: 0 0 0 2px rgba(74, 229, 131, 0.1), 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .abra-send-button {
@@ -704,119 +867,118 @@ function writeAssistantStyles(root: string): void {
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  background: #25d366;
+  background: rgba(74, 229, 131, 0.9);
   border: none;
-  border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.abra-send-button:hover {
+  transform: translateY(-50%) scale(1.05);
+  background-color: #4AE583;
 }
 
 .abra-send-button:disabled {
-  opacity: 0.7;
+  opacity: 0.5;
   cursor: not-allowed;
-}
-
-.abra-button-container {
-  position: fixed;
-  bottom: 32px;
-  right: 32px;
-  z-index: 9999;
-}
-
-.abra-circle-button {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #25d366;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
-  transition: transform 0.2s ease;
-}
-
-.abra-circle-button:hover {
-  transform: scale(1.05);
-}
-
-.abra-at-symbol {
-  color: black;
-  font-weight: bold;
-  font-size: 1.5rem;
+  background-color: rgba(74, 229, 131, 0.3);
 }
 
 .abra-dock-container {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 300px;
-  background: rgba(18, 18, 18, 0.9);
-  border-radius: 20px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  width: 340px;
+  background: rgba(18, 18, 18, 0.95);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(74, 229, 131, 0.15);
   backdrop-filter: blur(10px);
   z-index: 9999;
+  overflow: hidden;
 }
 
 .abra-dock-form {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 8px;
+  position: relative;
 }
 
 .abra-dock-input {
   flex: 1;
-  background: rgba(30, 30, 30, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(25, 25, 25, 0.95);
+  border: 1px solid rgba(74, 229, 131, 0.1);
   outline: none;
   font-size: 0.95rem;
   color: #f0f0f0;
-  padding: 8px 12px;
+  padding: 12px 46px 12px 16px;
   border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 .abra-dock-input:focus {
-  border-color: #25d366;
-  box-shadow: 0 0 0 2px rgba(37, 211, 102, 0.4);
+  border-color: #4AE583;
+  box-shadow: 0 0 0 2px rgba(74, 229, 131, 0.1), 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .abra-dock-input::placeholder {
-  color: #888;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 400;
+  opacity: 0.7;
 }
 
-.abra-try-label {
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #aaa;
-  padding: 6px 12px 4px;
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-bottom: none;
-  backdrop-filter: blur(10px);
-  letter-spacing: 0.5px;
+.abra-dock-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    rgba(74, 229, 131, 0), 
+    rgba(74, 229, 131, 0.3), 
+    rgba(74, 229, 131, 0));
+  z-index: 1;
 }
 
 .abra-dock-send {
-  background: none;
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(74, 229, 131, 0.9);
   border: none;
-  color: #25d366;
-  font-size: 1.2rem;
+  border-radius: 8px;
+  color: #000;
+  height: 32px;
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  padding: 4px;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, background-color 0.2s ease;
 }
 
 .abra-dock-send:hover {
-  transform: scale(1.1);
+  transform: translateY(-50%) scale(1.05);
+  background-color: #4AE583;
+}
+
+.abra-dock-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: rgba(74, 229, 131, 0.3);
 }
 
 @keyframes fadeIn {
@@ -828,6 +990,19 @@ function writeAssistantStyles(root: string): void {
   to { transform: rotate(360deg); }
 }
 
+/* Animation for notification messages */
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(74, 229, 131, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(74, 229, 131, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(74, 229, 131, 0); }
+}
+
+@keyframes shiftGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 @media (max-width: 480px) {
   .abra-container {
     width: calc(100% - 32px);
@@ -835,9 +1010,10 @@ function writeAssistantStyles(root: string): void {
     bottom: 16px;
   }
   
-  .abra-button-container {
-    bottom: 24px;
-    right: 24px;
+  .abra-dock-container {
+    width: calc(100% - 32px);
+    right: 16px;
+    bottom: 16px;
   }
 }`;
   fs.mkdirSync(path.dirname(file), { recursive: true });
