@@ -1,56 +1,103 @@
+import ts from 'typescript';
+import fs from 'fs';
+import path from 'path';
+
 export interface ScrapedContent {
-    pageTitle: string;
-    routes: string[];
-    navLabels: string[];
-    sections: { heading: string; content: string }[];
+  routes: string[];
+  navLabels: string[];
+  sections: { heading: string; content: string }[];
+}
+
+function getAllFiles(dir: string, ext: string[] = ['.tsx']): string[] {
+  const files: string[] = [];
+  fs.readdirSync(dir).forEach(file => {
+    const fullPath = path.join(dir, file);
+    const stat = fs.statSync(fullPath);
+    if (stat.isDirectory()) {
+      files.push(...getAllFiles(fullPath, ext));
+    } else if (ext.includes(path.extname(fullPath))) {
+      files.push(fullPath);
+    }
+  });
+  return files;
+}
+
+function extractTextFromJsx(node: ts.Node): string[] {
+  const text: string[] = [];
+
+  function recurse(n: ts.Node) {
+    if (ts.isJsxText(n)) {
+      const t = n.getText().trim();
+      if (t) text.push(t);
+    } else if (ts.isStringLiteral(n)) {
+      const t = n.text.trim();
+      if (t) text.push(t);
+    }
+    ts.forEachChild(n, recurse);
   }
-  
-  const isElementVisible = (el: HTMLElement): boolean => {
-    const style = window.getComputedStyle(el);
-    return (
-      style.display !== 'none' &&
-      style.visibility !== 'hidden' &&
-      !el.hasAttribute('aria-hidden')
-    );
-  };
-  
-  export const scrapeDOM = (): ScrapedContent => {
-    const pageTitle = document.title;
-  
-    const navLabels = Array.from(document.querySelectorAll('nav a'))
-      .filter(el => isElementVisible(el as HTMLElement))
-      .map(el => (el as HTMLElement).innerText.trim())
-      .filter(text => text.length > 0);
-  
-    const routes = Array.from(document.querySelectorAll('a[href^="/"]'))
-      .filter(el => isElementVisible(el as HTMLElement))
-      .map(el => (el as HTMLAnchorElement).href);
-  
-    const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4'))
-      .filter(el => isElementVisible(el as HTMLElement));
-  
-    const sections = headings.map(heading => {
-      let content = '';
-      let nextEl = heading.nextElementSibling;
-  
-      while (nextEl && !/^H[1-4]$/.test(nextEl.tagName)) {
-        if (isElementVisible(nextEl as HTMLElement) && !['SCRIPT', 'STYLE', 'CODE', 'PRE'].includes(nextEl.tagName)) {
-          content += ` ${nextEl.textContent?.trim()}`;
+
+  recurse(node);
+  return text;
+}
+
+export function scrapeDOMFromSource(rootDir: string): ScrapedContent {
+  const files = getAllFiles(rootDir);
+
+  const routes: Set<string> = new Set();
+  const navLabels: Set<string> = new Set();
+  const sections: { heading: string; content: string }[] = [];
+
+  for (const filePath of files) {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const source = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+
+    function visit(node: ts.Node) {
+      if (ts.isJsxSelfClosingElement(node) || ts.isJsxElement(node)) {
+        const tag = ts.isJsxElement(node) ? node.openingElement.tagName.getText() : node.tagName.getText();
+        const attributes = ts.isJsxElement(node) ? node.openingElement.attributes : node.attributes;
+
+        // Routes: <a href="/...">
+        if (tag === 'a' || tag === 'Link') {
+          for (const attr of attributes.properties) {
+            if (
+              ts.isJsxAttribute(attr) &&
+              attr.name.getText() === 'href' &&
+              attr.initializer &&
+              ts.isStringLiteral(attr.initializer)
+            ) {
+              routes.add(attr.initializer.text);
+            }
+          }
+
+          const label = extractTextFromJsx(node).join(' ').trim();
+          if (label) navLabels.add(label);
         }
-        nextEl = nextEl.nextElementSibling;
+
+        // Headings
+        if (['h1', 'h2', 'h3', 'h4'].includes(tag)) {
+          const heading = extractTextFromJsx(node).join(' ').trim();
+          if (heading) sections.push({ heading, content: '' });
+        }
+
+        // Paragraphs: assign to last heading
+        if (tag === 'p') {
+          const last = sections.at(-1);
+          if (last) {
+            const content = extractTextFromJsx(node).join(' ').trim();
+            if (content) last.content += ' ' + content;
+          }
+        }
       }
-  
-      return {
-        heading: heading.textContent?.trim() || '',
-        content: content.trim(),
-      };
-    }).filter(section => section.content.length > 0);
-  
-    return {
-      pageTitle,
-      routes: Array.from(new Set(routes)),
-      navLabels: Array.from(new Set(navLabels)),
-      sections,
-    };
+
+      ts.forEachChild(node, visit);
+    }
+
+    ts.forEachChild(source, visit);
+  }
+
+  return {
+    routes: [...routes],
+    navLabels: [...navLabels],
+    sections,
   };
-  
+}
