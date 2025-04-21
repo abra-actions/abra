@@ -8,7 +8,7 @@ export interface ScrapedContent {
   sections: { heading: string; content: string }[];
 }
 
-function getAllFiles(dir: string, ext: string[] = ['.tsx']): string[] {
+function getAllFiles(dir: string, ext: string[] = ['.tsx', 'jsx']): string[] {
   const files: string[] = [];
   fs.readdirSync(dir).forEach(file => {
     const fullPath = path.join(dir, file);
