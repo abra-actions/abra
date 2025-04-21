@@ -188,7 +188,7 @@ function generateActionsManifest(projectRoot: string): void {
     const parameters = extractParams(resolved.signature);
     actions.push({ name: prop.name.getText(), parameters });
   }
-  const domContext = scrapeDOMFromSource(projectRoot);
+  const domContext = scrapeDOMFromSource(path.join(projectRoot, 'src'));
   const outPath = path.join(projectRoot, 'src/abra-actions/__generated__/actions.json');
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify({ actions, domContext }, null, 2));
