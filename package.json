@@ -1,15 +1,15 @@
 {
   "name": "@abra-actions/sdk",
-  "version": "1.0.39",
+  "version": "1.0.40",
   "description": "A lightweight TypeScript SDK to expose frontend functions to LLMs via natural language. Includes action registration, typed parameter introspection, and a plug-and-play assistant UI.",
   "keywords": [
-  "sdk",
-  "actions",
-  "frontend",
-  "natural language",
-  "LLM",
-  "typescript",
-  "abra"
+    "sdk",
+    "actions",
+    "frontend",
+    "natural language",
+    "LLM",
+    "typescript",
+    "abra"
   ],
   "homepage": "https://github.com/abra-actions/abra#readme",
   "bugs": {
@@ -32,19 +32,19 @@
     "src/actionRegistry.ts"
   ],
   "exports": {
-  ".": {
-    "import": "./dist/index.js"
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./registry": {
+      "import": "./src/actionRegistry.ts"
+    },
+    "./executor": {
+      "import": "./src/__generated__/abra-executor.ts"
+    },
+    "./actions": {
+      "import": "./src/__generated__/actions.json"
+    }
   },
-  "./registry": {
-    "import": "./src/actionRegistry.ts"
-  },
-  "./executor": {
-    "import": "./src/__generated__/abra-executor.ts"
-  },
-  "./actions": {
-    "import": "./src/__generated__/actions.json"
-  }
-},
   "scripts": {
     "build": "tsup && node scripts/attachShebang.cjs"
   },
