@@ -225,6 +225,10 @@ export async function executeAction(actionName: string, params: any) {
   }
 }
 `;
+  const file = path.join(root, 'src/abra-actions/__generated__/abra-executor.ts');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, out);
+  console.log(`✅ Wrote abra-executor.ts`);
   }
 
 
