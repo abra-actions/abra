@@ -418,82 +418,101 @@ const AbraAssistant = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!state.input.trim() || state.isLoading) return;
-  
-    updateState({
-      isLoading: true,
-      isProcessing: true,
-      status: "Resolving action...",
-      result: null,
-      error: null
-    });
-  
-    try {
-      const res = await fetch(\`\${BACKEND_URL}/api/resolve-action\`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': ABRA_API_KEY  },
-        body: JSON.stringify({ 
-          userIntent: state.input, 
-          actions: actionsJson.actions,
-          previousContext: state.previousContext
-        })
-      });
-  
-      const aiResponse = await res.json();
-  
-      if (aiResponse.followup) {
-        updateState({
-          status: aiResponse.followup.message,
-          previousContext: {
-            action: aiResponse.action,
-            params: { 
-              ...state.previousContext?.params,
-              ...aiResponse.params
-            }
-          },
-          input: '',
-          isLoading: false,
-          isProcessing: false,
-        });
-        return;
-      }
-  
-      const executionResult = await executeActionResponse({
-          type: aiResponse.type,
-          content: aiResponse.action ?? aiResponse.content,
-          params: aiResponse.params
-        });
+  e.preventDefault();
+  if (!state.input.trim() || state.isLoading) return;
 
-  
-      if (executionResult.success) {
-        updateState({
-          result: executionResult.result,
-          status: \`Successfully executed: \${aiResponse.action}\`,
-          input: '',
-          previousContext: null, 
-          showSuccess: true
-        });
-  
-        setTimeout(() => {
-          updateState({ showSuccess: false });
-          textInputRef.current?.focus();
-        }, 4000);
-      } else {
-        throw new Error(executionResult.error);
-      }
-    } catch (err: any) {
+  updateState({
+    isLoading: true,
+    isProcessing: true,
+    status: "Resolving action...",
+    result: null,
+    error: null
+  });
+
+  try {
+    const res = await fetch(\`\${BACKEND_URL}/api/resolve-action\`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ABRA_API_KEY
+      },
+      body: JSON.stringify({
+        userIntent: state.input,
+        actions: actionsJson.actions,
+        previousContext: state.previousContext
+      })
+    });
+
+    const aiResponse = await res.json();
+
+    if (!res.ok) {
+      const knownErrors: Record<string, string> = {
+        MISSING_API_KEY: "Missing API key. Please configure your Abra API key.",
+        INVALID_API_KEY: "Invalid API key. Double-check your configuration.",
+        INACTIVE_API_KEY: "This API key is inactive.",
+        TOKEN_LIMIT_EXCEEDED: "You've hit the free tier limit. Upgrade to continue using Abra.",
+        INTERNAL_ERROR: "Something went wrong while resolving your request. Try again later."
+      };
+
       updateState({
-        error: err.message,
-        status: "Operation failed"
+        error: knownErrors[aiResponse.code] || aiResponse.error || "An unknown error occurred.",
+        status: "Request failed"
       });
-    } finally {
-      updateState({
-        isLoading: false,
-        isProcessing: false
-      });
+      return;
     }
-  };
+
+    if (aiResponse.followup) {
+      updateState({
+        status: aiResponse.followup.message,
+        previousContext: {
+          action: aiResponse.action,
+          params: {
+            ...state.previousContext?.params,
+            ...aiResponse.params
+          }
+        },
+        input: '',
+        isLoading: false,
+        isProcessing: false,
+      });
+      return;
+    }
+
+    const executionResult = await executeActionResponse({
+      type: aiResponse.type,
+      content: aiResponse.action ?? aiResponse.content,
+      params: aiResponse.params
+    });
+
+    if (executionResult.success) {
+      updateState({
+        result: executionResult.result,
+        status: \`Successfully executed: \${aiResponse.action}\`,
+        input: '',
+        previousContext: null,
+        showSuccess: true
+      });
+
+      setTimeout(() => {
+        updateState({ showSuccess: false });
+        textInputRef.current?.focus();
+      }, 4000);
+    } else {
+      throw new Error(executionResult.error);
+    }
+  } catch (err: any) {
+    updateState({
+      error: err.message || "Unexpected error",
+      status: "Operation failed"
+    });
+  } finally {
+    updateState({
+      isLoading: false,
+      isProcessing: false
+    });
+  }
+};
+
   
   const handleExampleClick = (example: string) => {
     updateState({ input: example });
