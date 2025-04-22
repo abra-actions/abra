@@ -20,6 +20,9 @@
     "url": "git+https://github.com/abra-actions/abra.git"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "author": "abra-actions",
   "type": "commonjs",
   "main": "dist/index.js",
