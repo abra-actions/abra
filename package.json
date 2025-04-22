@@ -38,14 +38,8 @@
     ".": {
       "import": "./dist/index.js"
     },
-    "./registry": {
-      "import": "./src/actionRegistry.ts"
-    },
-    "./executor": {
-      "import": "./src/__generated__/abra-executor.ts"
-    },
-    "./actions": {
-      "import": "./src/__generated__/actions.json"
+    "./AbraAssistant": {
+      "import": "./dist/AbraAssistant.tsx"
     }
   },
   "scripts": {
