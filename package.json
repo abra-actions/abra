@@ -1,6 +1,6 @@
 {
   "name": "@abra-actions/sdk",
-  "version": "1.0.48",
+  "version": "1.0.49",
   "description": "A lightweight TypeScript SDK to expose frontend functions to LLMs via natural language. Includes action registration, typed parameter introspection, and a plug-and-play assistant UI.",
   "keywords": [
     "sdk",
