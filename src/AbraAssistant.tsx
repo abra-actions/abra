@@ -903,6 +903,7 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config })=> {
   bottom: 24px;
   right: 24px;
   z-index: 10000;
+  background: transparent;
 }
 
 .abra-chat-button-inner {
@@ -912,10 +913,36 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config })=> {
   margin: 0;
   cursor: pointer;
   transition: transform 0.2s ease;
+  outline: none; 
+  box-shadow: none;
+}
+
+.abra-chat-button-inner svg {
+  display: block; 
 }
 
 .abra-chat-button-inner:hover {
   transform: scale(1.05);
+}
+
+.abra-tooltip {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 10px;
+  white-space: nowrap;
+  background: rgba(18, 18, 18, 0.95);
+  color: #f0f0f0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  opacity: 0.9;
+  transform: translateY(10px);
+  transition: opacity 0.3s, transform 0.3s;
+  border: 1px solid rgba(74, 229, 131, 0.2);
+  z-index: 10001;
 }
 
 .abra-logo-image {
