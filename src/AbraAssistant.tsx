@@ -696,10 +696,6 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
             className="abra-chat-button-inner"
             aria-label="Open Abra Assistant"
           >
-            <div className="abra-tooltip">
-              <span className="abra-tooltip-icon">💬</span>
-              Chat with Abra Now!
-            </div>
             <svg width="110" height="110" viewBox="0 0 149 149" fill="none" xmlns="http://www.w3.org/2000/svg">
               <g filter="url(#filter0_d_5_2)">
               <path d="M119 74.5C119 99.0767 99.0767 119 74.5 119C49.9233 119 30 99.0767 30 74.5C30 49.9233 49.9233 30 74.5 30C99.0767 30 119 49.9233 119 74.5Z" fill="#232323"/>
