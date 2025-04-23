@@ -2,12 +2,13 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
-  format: ['cjs'],                
-  bundle: true,                   
-  noExternal: ['typescript'],     
-  platform: 'node',
-  target: 'node18',
-  outDir: 'dist',
-  clean: true
-});
+  entry: ['src/index.ts', 'src/AbraAssistant.tsx'],
+  format: ['esm'],
+  dts: true,
+  splitting: false,
+  sourcemap: true,
+  clean: true,
+  bundle: true,
+  external: ['react', 'react-dom'],
+  outExtension: () => ({ js: '.js' })
+})
