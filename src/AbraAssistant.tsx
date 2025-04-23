@@ -286,328 +286,405 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
     </svg>
   );
   
-  const styles = `
-    @import url('https://fonts.googleapis.com/css2?family=Krona+One&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-    
-    .abra-container {
-      position: fixed !important;
-      bottom: 24px !important;
-      right: 24px !important;
-      width: 380px !important;
-      max-width: calc(100% - 48px) !important;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      border-radius: 12px !important;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(74, 229, 131, 0.15) !important;
-      background-color: rgba(14, 14, 14, 0.95) !important;
-      backdrop-filter: blur(10px) !important;
-      overflow: hidden !important;
-      z-index: 10000 !important;
-      animation: fadeIn 0.3s ease-out !important;
-      color: #f0f0f0 !important;
-    }
-    
-    .abra-header {
-      padding: 16px 18px !important;
-      border-bottom: 1px solid rgba(74, 229, 131, 0.15) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      background-color: #121212 !important;
-    }
-    
-    .abra-title {
-      margin: 0 !important;
-      color: #f0f0f0 !important;
-      font-size: 1.25rem !important;
-      font-weight: 500 !important;
-      font-family: 'Krona One', sans-serif !important;
-      letter-spacing: -0.02em !important;
-    }
-    
-    .abra-close-button {
-      background: rgba(40, 40, 40, 0.95) !important;
-      border: none !important;
-      color: #f0f0f0 !important;
-      font-size: 1.5rem !important;
-      cursor: pointer !important;
-      padding: 0 !important;
-      transition: color 0.2s ease !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: 32px !important;
-      height: 32px !important;
-      border-radius: 50% !important;
-    }
-    
-    .abra-close-button:hover {
-      color: #4AE583 !important;
-    }
-    
-    .abra-content {
-      padding: 16px !important;
-      background-color: #111111 !important;
-      max-height: 60vh !important;
-      overflow-y: auto !important;
-      transition: max-height 0.3s ease-out !important;
-      color: #f0f0f0 !important;
-    }
-    
-    .abra-message-container {
-      margin-bottom: 16px !important;
-    }
+  const styles = `@import url('https://fonts.googleapis.com/css2?family=Krona+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
-    .abra-message {
-      color: #f0f0f0 !important;
-      padding: 12px 16px !important;
-      border-radius: 8px !important;
-      margin-bottom: 12px !important;
-      font-size: 0.95rem !important;
-      line-height: 1.5 !important;
-      backdrop-filter: blur(4px) !important;
-      background-color: rgba(40, 40, 40, 0.6) !important;
-      border: 1px solid rgba(255, 255, 255, 0.03) !important;
-    }
+.abra-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 380px;
+  max-width: calc(100% - 48px);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(74, 229, 131, 0.15);
+  background-color: rgba(14, 14, 14, 0.95);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease-out;
+}
 
-    .abra-message strong {
-      color: #fff !important;
-      font-family: 'Krona One', sans-serif !important;
-      font-size: 0.9rem !important;
-      letter-spacing: -0.01em !important;
-    }
+.abra-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: rgba(14, 14, 14, 0.98);
+}
 
-    .abra-welcome-message {
-      background: #1e2b1e !important;
-      border-left: 4px solid #4AE583 !important;
-      padding: 16px !important;
-    }
+.abra-title {
+  margin: 0;
+  color: #f0f0f0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  font-family: 'Krona One', sans-serif;
+  letter-spacing: -0.02em;
+}
 
-    .abra-welcome-message strong {
-      display: block !important;
-      margin-bottom: 8px !important;
-      font-size: 1.2rem !important;
-    }
+.abra-close-button {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
 
+.abra-close-button:hover {
+  color: #4AE583;
+}
 
-    .error-message {
-      background: linear-gradient(135deg, rgba(255, 82, 82, 0.08) 0%, rgba(255, 82, 82, 0.02) 100%) !important;
-      border: none !important;
-      position: relative !important;
-      color: #ff8a8a !important;
-      box-shadow: 0 4px 12px rgba(255, 82, 82, 0.15) !important;
-      overflow: hidden !important;
-    }
-    
-    .error-message::before {
-      content: "" !important;
-      position: absolute !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 4px !important;
-      height: 100% !important;
-      background: linear-gradient(to bottom, #ff5252, rgba(255, 82, 82, 0.5)) !important;
-    }
-    
-    .result-message {
-      background-color: rgba(40, 40, 40, 0.7) !important;
-      font-family: monospace !important;
-    }
-    
-    .abra-thinking-container {
-      margin: 12px 0 !important;
-      background: rgba(0, 0, 0, 0.2) !important;
-      border-radius: 8px !important;
-      padding: 12px !important;
-      border: 1px solid rgba(255, 255, 255, 0.03) !important;
-    }
-    
-    .abra-thinking-step {
-      color: #aaa !important;
-      font-size: 0.9rem !important;
-      display: flex !important;
-      align-items: center !important;
-      margin-bottom: 8px !important;
-    }
-    
-    .abra-step-checkmark {
-      color: #4AE583 !important;
-      margin-right: 8px !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: 18px !important;
-      height: 18px !important;
-    }
-    
-    .abra-loader {
-      border: 2px solid rgba(74, 229, 131, 0.1) !important;
-      border-top: 2px solid #4AE583 !important;
-      border-right: 2px solid #4AE583 !important;
-      border-radius: 50% !important;
-      width: 14px !important;
-      height: 14px !important;
-      animation: spin 0.8s linear infinite !important;
-      margin-right: 8px !important;
-    }
-    
-    .abra-success-message {
-      background: linear-gradient(135deg, rgba(74, 229, 131, 0.08) 0%, rgba(74, 229, 131, 0.02) 100%) !important;
-      border: none !important;
-      color: #4AE583 !important;
-      border-radius: 8px !important;
-      padding: 16px !important;
-      margin: 12px 0 !important;
-      position: relative !important;
-      backdrop-filter: blur(4px) !important;
-      box-shadow: 0 4px 12px rgba(74, 229, 131, 0.1) !important;
-      overflow: hidden !important;
-      display: flex !important;
-      align-items: center !important;
-    }
-    
-    .abra-success-message::before {
-      content: "" !important;
-      position: absolute !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 4px !important;
-      height: 100% !important;
-      background: linear-gradient(to bottom, #4AE583, rgba(74, 229, 131, 0.5)) !important;
-    }
-    
-    .abra-success-icon {
-      margin-right: 8px !important;
-      width: 20px !important;
-      height: 20px !important;
-      background: rgba(74, 229, 131, 0.2) !important;
-      border-radius: 50% !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-    }
-    
-    .abra-input-container {
-      display: flex !important;
-      margin-top: 8px !important;
-      position: relative !important;
-    }
-    
-    .abra-input {
-      flex: 1 !important;
-      padding: 12px 46px 12px 16px !important;
-      border-radius: 12px !important;
-      border: 1px solid rgba(255, 255, 255, 0.08) !important;
-      background-color: rgba(20, 20, 20, 0.8) !important;
-      color: #f0f0f0 !important;
-      font-size: 0.95rem !important;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      min-height: 46px !important;
-      height: auto !important;
-      max-height: 120px !important;
-      overflow-y: auto !important;
-      resize: none !important;
-      transition: border-color 0.2s ease, min-height 0.2s ease, box-shadow 0.2s ease !important;
-    }
-    
-    .abra-input:focus {
-      outline: none !important;
-      border-color: rgba(74, 229, 131, 0.5) !important;
-      box-shadow: 0 0 0 2px rgba(74, 229, 131, 0.1), 0 2px 8px rgba(0, 0, 0, 0.1) !important;
-    }
-    
-    .abra-send-button {
-      position: absolute !important;
-      right: 8px !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-      background: rgba(74, 229, 131, 0.9) !important;
-      border: none !important;
-      border-radius: 8px !important;
-      width: 30px !important;
-      height: 30px !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      cursor: pointer !important;
-      transition: transform 0.2s ease, background-color 0.2s ease !important;
-    }
-    
-    .abra-send-button:hover {
-      transform: translateY(-50%) scale(1.05) !important;
-      background-color: #4AE583 !important;
-    }
-    
-    .abra-send-button:disabled {
-      opacity: 0.5 !important;
-      cursor: not-allowed !important;
-      background-color: rgba(74, 229, 131, 0.3) !important;
-    }
-    
-    .abra-chat-button {
-      position: fixed !important;
-      bottom: 24px !important;
-      right: 24px !important;
-      z-index: 10000 !important;
-      background: transparent !important;
-    }
-    
-    .abra-chat-button-inner {
-      background: transparent !important;
-      border: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      cursor: pointer !important;
-      transition: transform 0.2s ease !important;
-      outline: none !important; 
-      box-shadow: none !important;
-    }
-    
-    .abra-chat-button-inner svg {
-      display: block !important; 
-    }
-    
-    .abra-chat-button-inner:hover {
-      transform: scale(1.05) !important;
-    }
-    
-    .abra-tooltip {
-      position: absolute !important;
-      bottom: 100% !important;
-      right: 0 !important;
-      margin-bottom: 10px !important;
-      white-space: nowrap !important;
-      background: rgba(18, 18, 18, 0.95) !important;
-      color: #f0f0f0 !important;
-      padding: 8px 12px !important;
-      border-radius: 8px !important;
-      font-size: 14px !important;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
-      pointer-events: none !important;
-      opacity: 0.9 !important;
-      transform: translateY(10px) !important;
-      transition: opacity 0.3s, transform 0.3s !important;
-      border: 1px solid rgba(74, 229, 131, 0.2) !important;
-      z-index: 10001 !important;
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    @media (max-width: 480px) {
-      .abra-container {
-        width: calc(100% - 32px) !important;
-        right: 16px !important;
-        bottom: 16px !important;
-      }
-    }
-  `;
+.abra-content {
+  padding: 16px;
+  background-color: #111111;
+  max-height: 60vh;
+  overflow-y: auto;
+  transition: max-height 0.3s ease-out;
+}
+
+.abra-message-container {
+  margin-bottom: 16px;
+}
+
+.abra-message {
+  background-color: rgba(255, 255, 255, 0.03);
+  color: #f0f0f0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.abra-message strong {
+  color: #fff;
+  font-family: 'Krona One', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+}
+
+.abra-message ul {
+  margin-top: 10px;
+}
+
+.abra-message li {
+  margin-bottom: 6px;
+  color: #ccc;
+  position: relative;
+  transition: color 0.15s ease, transform 0.15s ease;
+  padding-left: 5px;
+}
+
+.abra-message li:hover {
+  color: #4AE583;
+  cursor: pointer;
+  transform: translateX(2px);
+}
+
+.error-message {
+  background: linear-gradient(135deg, rgba(255, 82, 82, 0.08) 0%, rgba(255, 82, 82, 0.02) 100%) !important;
+  border: none !important;
+  position: relative;
+  color: #ff8a8a !important;
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.15);
+  overflow: hidden;
+}
+
+.error-message::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, #ff5252, rgba(255, 82, 82, 0.5));
+}
+
+.error-message::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 82, 82, 0.5), transparent);
+}
+
+.result-message {
+  background-color: rgba(40, 40, 40, 0.7);
+  font-family: monospace;
+}
+
+.abra-thinking-container {
+  margin: 12px 0;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.abra-thinking-step {
+  color: #aaa;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.abra-step-checkmark {
+  color: #4AE583;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.abra-loader {
+  border: 2px solid rgba(74, 229, 131, 0.1);
+  border-top: 2px solid #4AE583;
+  border-right: 2px solid #4AE583;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+}
+
+.abra-success-message {
+  background: linear-gradient(135deg, rgba(74, 229, 131, 0.08) 0%, rgba(74, 229, 131, 0.02) 100%);
+  border: none;
+  color: #4AE583;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+  position: relative;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(74, 229, 131, 0.1);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.abra-success-message::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, #4AE583, rgba(74, 229, 131, 0.5));
+}
+
+.abra-success-message::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(74, 229, 131, 0.5), transparent);
+}
+
+.abra-success-icon {
+  margin-right: 8px;
+  width: 20px;
+  height: 20px;
+  background: rgba(74, 229, 131, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.abra-input-container {
+  display: flex;
+  margin-top: 8px;
+  position: relative;
+}
+
+.abra-input {
+  flex: 1;
+  padding: 12px 46px 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: rgba(20, 20, 20, 0.8);
+  color: #f0f0f0;
+  font-size: 0.95rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 46px;
+  height: auto;
+  max-height: 120px;
+  overflow-y: auto;
+  resize: none;
+  transition: border-color 0.2s ease, min-height 0.2s ease, box-shadow 0.2s ease;
+}
+
+.abra-input:focus {
+  outline: none;
+  border-color: rgba(74, 229, 131, 0.5);
+  box-shadow: 0 0 0 2px rgba(74, 229, 131, 0.1), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.abra-send-button {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(74, 229, 131, 0.9);
+  border: none;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.abra-send-button:hover {
+  transform: translateY(-50%) scale(1.05);
+  background-color: #4AE583;
+}
+
+.abra-send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: rgba(74, 229, 131, 0.3);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(74, 229, 131, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(74, 229, 131, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(74, 229, 131, 0); }
+}
+
+@keyframes shiftGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@media (max-width: 480px) {
+  .abra-container {
+    width: calc(100% - 32px);
+    right: 16px;
+    bottom: 16px;
+  }
+}
+
+.abra-header {
+  padding: 16px 18px !important;
+  background-color: #121212 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  border-bottom: 1px solid rgba(74, 229, 131, 0.15) !important;
+}
+
+.abra-title {
+  font-family: 'Krona One', sans-serif !important;
+  font-size: 1.5rem !important;
+  font-weight: bold !important;
+  color: #f0f0f0 !important;
+  letter-spacing: -0.02em !important;
+  margin: 0 !important;
+}
+
+.abra-header-branding {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.abra-close-button {
+  background: rgba(40, 40, 40, 0.95) !important;
+  color: #f0f0f0 !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 1.5rem !important;
+}
+
+.abra-welcome-message {
+  background: #1e2b1e !important;
+  border-left: 4px solid #4AE583 !important;
+  color: #f0f0f0 !important;
+  padding: 16px !important;
+  border-radius: 8px !important;
+  margin-bottom: 16px !important;
+}
+
+.abra-welcome-message strong {
+  display: block !important;
+  margin-bottom: 8px !important;
+  color: #f0f0f0 !important;
+  font-size: 1.2rem !important;
+}
+
+.abra-welcome-message p {
+  margin: 0 !important;
+  color: #f0f0f0 !important;
+  font-size: 0.95rem !important;
+  line-height: 1.5 !important;
+}
+
+.abra-chat-button {
+  position: fixed;
+  bottom: 8px;
+  right: 16px;
+  z-index: 10000;
+}
+
+.abra-chat-button-inner {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  position: relative;
+}
+
+.abra-chat-button-inner:hover {
+  transform: scale(1.05);
+}
+
+.abra-logo-image {
+  width: 110px;
+  height: 110px;
+  display: block;
+  background-color: transparent !important;
+  border: none;
+  box-shadow: none;
+  filter: drop-shadow(0 0 8px rgba(74, 229, 131, 0.4));
+}`;
 
   if (!state.expanded) {
     return (
