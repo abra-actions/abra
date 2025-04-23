@@ -302,7 +302,7 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config })=> {
               <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_5_2" result="shape"/>
               </filter>
               <filter id="filter1_d_5_2" x="27.3333" y="23.9977" width="96.6685" height="96.6707" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-              <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+              <feFlood floodOpacity="0" result="BackgroundImageFix"/>
               <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
               <feOffset/>
               <feGaussianBlur stdDeviation="15"/>
