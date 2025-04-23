@@ -224,7 +224,7 @@ const abraConfig = {
 
 export default abraConfig;
 `;
-  const file = path.join(root, 'abra.config.ts');
+  const file = path.join(root, 'src/abra.config.ts');
   fs.writeFileSync(file, out);
   console.log(`✅ Wrote abra.config.ts`);
 }
