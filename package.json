@@ -47,7 +47,7 @@
     }
   },
   "scripts": {
-    "build": "tsup && node scripts/attachShebang.cjs"
+    "build": "tsup && node scripts/attachShebang.cjs && chmod +x dist/index.js"
   },
   "dependencies": {
     "ansi-regex": "^6.1.0",

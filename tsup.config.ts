@@ -3,7 +3,7 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts', 'src/AbraAssistant.tsx'],
-  format: ['esm'],
+  format: ['cjs'],
   dts: true,
   splitting: false,
   sourcemap: true,
