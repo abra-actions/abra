@@ -9,10 +9,10 @@
 ## ✨ Features
 
 - **TypeScript Integration** – Automatically extracts type information from your functions
-- **LLM-Powered** – Uses OpenAI's GPT models to understand user intent
+- **LLM-Powered** – Uses LLM models to understand user intent
 - **Zero Boilerplate** – Just import functions into the registry, no annotations or decorators
 - **Type Safety** – Validates and transforms user input based on your type definitions
-- **No Data Leakage** – Only function names and descriptions are sent to the LLM; your code and data stay private
+- **No Data Leakage** – Only function names and optional descriptions are sent to the LLM; your code and data stay private
 - **Executes Locally** – All actions are run through your code, on your infra, with your auth and security context
 
 ---
@@ -30,21 +30,21 @@ npm install abra-actions
 ### 1. Initialize abra
 
 ```bash
-npx abra-actions init
+abra-actions init (npx abra-actions init)
 ```
 
 This command sets up the abra scaffold in your `/src` directory:
 
-- `actionRegistry.ts` – Import and register your callable functions here
-- `actions.json` – Generated manifest of all actions and types
-- `abra-executor.ts` – Lightweight wrapper to execute actions via the registry
+- `./abra_actions/actionRegistry.ts` – Import and register your callable functions here
+- `./abra-actions__gactions.json` – Generated manifest of all actions and types
+- `./abra.config.ts` – Lightweight wrapper to execute actions via the registry
 
 ---
 
 ### 2. Register your functions
 
 ```ts
-// src/abra-actions/__generated__/actionRegistry.ts
+// src/abra-actions/actionRegistry.ts
 
 import { 
   addToCart, 
@@ -66,26 +66,30 @@ export const actionRegistry = {
 ### 3. Generate the actions
 
 ```bash
-npx abra-actions generate
+abra-actions generate (npx abra-actions generate)
 ```
 
 This command:
 - Populates `actions.json` with metadata about your functions
-- Infers parameter types
-- Updates the `abra-executor.ts` file for secure local execution
+- We collect:
+  - Function Name
+  - Function Description (optional)
+  - Parameter Names
+  - Destructed Types
 
 ---
 
 ### 4. Use the assistant in your UI
 
 ```tsx
-import { AbraAssistant } from '../abra-actions/AbraAssistant';
+import { AbraAssistant } from '@abra-actions/sdk/AbraAssistant';
+import config from './abra.config.ts';
 
 function MyComponent() {
   return (
     <div>
       <h1>My App</h1>
-      <AbraAssistant />
+      <AbraAssistant config={config} />
     </div>
   );
 }
@@ -93,58 +97,6 @@ function MyComponent() {
 
 ---
 
-### 🧩 Using Abra via API (Custom Components)
-
-If you prefer to connect your own UI to Abra’s backend without using the built-in assistant, you can call the API directly and pass the result to `executeAction`.
-
-The API requires an environment variable:
-
-```bash
-REACT_APP_ABRA_API_KEY=your-key-here
-```
-
----
-
-### ⚡ Minimal Example
-
-```tsx
-import { useState } from 'react';
-import { executeAction } from '../abra-actions/__generated__/abra-executor';
-import actions from '../abra-actions/__generated__/actions.json';
-
-const BACKEND_URL = 'abra-api';
-
-export default function AbraInput() {
-  const [input, setInput] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const res = await fetch(`${BACKEND_URL}/api/resolve-action`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ABRA_PUBLIC_API_KEY,
-      },
-      body: JSON.stringify({ userIntent: input, actions }),
-    });
-
-    const { action, params } = await res.json();
-    await executeAction(action, params);
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <input value={input} onChange={e => setInput(e.target.value)} />
-      <button type="submit">Run</button>
-    </form>
-  );
-}
-```
-
-This gives you full control over the UI while still leveraging Abra’s core LLM routing and function execution.
-
----
 
 ## 📄 License
 
