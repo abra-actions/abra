@@ -199,7 +199,8 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
       isProcessing: true,
       status: "Resolving action...",
       result: null,
-      error: null
+      error: null,
+      showSuccess: false
     });
   
     try {
@@ -253,16 +254,11 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
       if (executionResult.success) {
         updateState({
           result: executionResult.result,
-          status: `Successfully executed: ${aiResponse.action}`,
+          status: ``,
           input: '',
           previousContext: null, 
           showSuccess: true
         });
-  
-        setTimeout(() => {
-          updateState({ showSuccess: false });
-          textInputRef.current?.focus();
-        }, 4000);
       } else {
         throw new Error(executionResult.error);
       }
