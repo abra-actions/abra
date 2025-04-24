@@ -22,21 +22,21 @@ type AssistantState = {
 };
 
 type RegistryEntry = {
-    function: Function;
-    description?: string;
-    suggested?: boolean;
-    suggestion?: string;
+  function: Function;
+  description?: string;
+  suggested?: boolean;
+  suggestion?: string;
 };
   
 
 export interface AbraConfig {
-    apiKey: string;
-    actionRegistry: RegistryEntry[];
-    actions: ActionDefinition[];
+  apiKey: string;
+  actionRegistry: RegistryEntry[];
+  actions: ActionDefinition[];
 }
 
 interface AbraAssistantProps {
-    config: AbraConfig;
+  config: AbraConfig;
 }
 
 const loadFonts = () => {
@@ -81,16 +81,23 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
   .filter(entry => entry.suggested && entry.suggestion)
   .map(entry => entry.suggestion!);
 
+  const registryMap = Object.fromEntries(
+    config.actionRegistry.map(entry => [entry.function.name, entry])
+  );
+
   const execute = async (name: string, params: any) => {
-    const fn = actionRegistry[name];
-    if (!fn) throw new Error(`Action "${name}" not found`);
+    const entry = registryMap[name];
+    if (!entry || typeof entry.function !== "function") {
+      throw new Error(`Action "${name}" not found`);
+    }
     try {
-      const result = await fn(params);
+      const result = await entry.function(params);
       return { success: true, result };
     } catch (e: any) {
       return { success: false, error: e.message };
     }
   };
+  
 
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
