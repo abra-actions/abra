@@ -21,9 +21,17 @@ type AssistantState = {
   previousContext: { action: string, params: Record<string, any> } | null;
 };
 
+type RegistryEntry = {
+    function: Function;
+    description?: string;
+    suggested?: boolean;
+    suggestion?: string;
+};
+  
+
 export interface AbraConfig {
     apiKey: string;
-    actionRegistry: Record<string, (params: any) => Promise<any>>;
+    actionRegistry: RegistryEntry[];
     actions: ActionDefinition[];
 }
 
@@ -68,6 +76,10 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
     showSuccess: false,
     previousContext: null,
   });
+
+  const suggested: string[] = (Object.values(config.actionRegistry) as RegistryEntry[])
+  .filter(entry => entry.suggested && entry.suggestion)
+  .map(entry => entry.suggestion!);
 
   const execute = async (name: string, params: any) => {
     const fn = actionRegistry[name];
@@ -765,6 +777,22 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
               <strong>Hi there! I'm Abra</strong>
               <p>I can execute actions on your behalf to help you get things done quickly.</p>
             </div>
+
+            {suggested.length > 0 && (
+              <div className="abra-message">
+                <strong>Try Abra with some of our favorites:</strong>
+                <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
+                  {suggested.map((example, index) => (
+                    <li 
+                      key={index} 
+                      onClick={() => updateState({ input: example })}
+                    >
+                      {example}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {state.isProcessing && (
               <div className="abra-thinking-container">
