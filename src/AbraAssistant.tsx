@@ -22,6 +22,7 @@ type AssistantState = {
 };
 
 type RegistryEntry = {
+  name: string;
   function: Function;
   description?: string;
   suggested?: boolean;
@@ -82,7 +83,7 @@ const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
   .map(entry => entry.suggestion!);
 
   const registryMap = Object.fromEntries(
-    config.actionRegistry.map(entry => [entry.function.name, entry])
+    actionRegistry.map(entry => [entry.name, entry])
   );
 
   const execute = async (name: string, params: any) => {
