@@ -100,37 +100,45 @@ function generateActionsManifest(projectRoot: string): void {
   const allFiles = getAllTSFiles(path.join(projectRoot, 'src'));
   const program = ts.createProgram(allFiles, { allowJs: false });
   const checker = program.getTypeChecker();
+
   const registryPath = path.join(projectRoot, 'src/abra-actions/actionRegistry.ts');
   const sourceFile = program.getSourceFile(registryPath);
   if (!sourceFile) {
     console.error(`Could not read source file from ${registryPath}`);
     process.exit(1);
   }
+
   const actions: any[] = [];
-  let registryObjectLiteral: ts.ObjectLiteralExpression | null = null;
+  
+  // Find the actionRegistry variable declaration
+  let registryEntries: ts.Expression[] = [];
+  
   ts.forEachChild(sourceFile, node => {
     if (ts.isVariableStatement(node)) {
       node.declarationList.declarations.forEach(decl => {
-        if (decl.name.getText() === 'actionRegistry' && decl.initializer && ts.isObjectLiteralExpression(decl.initializer)) {
-          registryObjectLiteral = decl.initializer;
+        if (decl.name && decl.name.getText() === 'actionRegistry' && decl.initializer) {
+          // Check if it's an array literal expression
+          if (ts.isArrayLiteralExpression(decl.initializer)) {
+            registryEntries = Array.from(decl.initializer.elements);
+          }
         }
       });
     }
   });
-  if (!registryObjectLiteral) {
-    console.error("Could not find actionRegistry object literal in registry file.");
+
+  if (registryEntries.length === 0) {
+    console.error("Could not find actionRegistry entries in registry file.");
     process.exit(1);
   }
+
   function resolveFunctionSignature(identifier: ts.Identifier): { name: string; signature: ts.Signature } | null {
     const symbol = checker.getSymbolAtLocation(identifier);
-    if (!symbol) {
-      return null;
-    }
+    if (!symbol) return null;
+
     const targetSymbol = (symbol.flags & ts.SymbolFlags.Alias) ? checker.getAliasedSymbol(symbol) : symbol;
     const declarations = targetSymbol.getDeclarations();
-    if (!declarations || declarations.length === 0) {
-      return null;
-    }
+    if (!declarations || declarations.length === 0) return null;
+
     let signature: ts.Signature | undefined = undefined;
     for (const d of declarations) {
       if (ts.isFunctionDeclaration(d) || ts.isFunctionExpression(d) || ts.isArrowFunction(d) || ts.isMethodDeclaration(d)) {
@@ -138,16 +146,18 @@ function generateActionsManifest(projectRoot: string): void {
         if (signature) break;
       }
     }
+
     if (!signature) {
       const type = checker.getTypeOfSymbolAtLocation(targetSymbol, declarations[0]);
-      signature = type.getCallSignatures()[0];
+      const signatures = type.getCallSignatures();
+      signature = signatures.length > 0 ? signatures[0] : undefined;
     }
-    if (!signature) {
-      return null;
-    }
-    console.log(`Type of '${identifier.text}':`, checker.typeToString(checker.getTypeOfSymbolAtLocation(targetSymbol, declarations[0])));
+
+    if (!signature) return null;
+
     return { name: identifier.text || targetSymbol.getName() || 'default', signature };
   }
+
   function extractParams(signature: ts.Signature): Record<string, any> {
     const params: Record<string, any> = {};
     for (const param of signature.getParameters()) {
@@ -165,56 +175,57 @@ function generateActionsManifest(projectRoot: string): void {
     }
     return params;
   }
-  const registryObj = registryObjectLiteral as ts.ObjectLiteralExpression;
-  for (const prop of registryObj.properties) {
-    if (!('name' in prop) || !prop.name) continue;
-    console.log("Processing property:", prop.name.getText());
-  
+
+  // Now safely iterate through the entries
+  for (const element of registryEntries) {
+    if (!ts.isObjectLiteralExpression(element)) continue;
+
+    let name: string | undefined;
     let identifier: ts.Identifier | undefined;
-    let description: string | undefined = undefined;
-  
-    if (ts.isPropertyAssignment(prop) && ts.isObjectLiteralExpression(prop.initializer)) {
-      for (const field of prop.initializer.properties) {
-        if (ts.isPropertyAssignment(field) && ts.isIdentifier(field.name)) {
-          const key = field.name.text;
-          const valueNode = field.initializer;
-          if (key === "description" && ts.isStringLiteral(valueNode)) {
-            description = valueNode.text;
-          }
-          if (key === "function" && ts.isIdentifier(valueNode)) {
-            identifier = valueNode;
-          }
+    let description: string | undefined;
+
+    for (const prop of element.properties) {
+      if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
+        const key = prop.name.text;
+        const valueNode = prop.initializer;
+
+        if (key === "name" && ts.isStringLiteral(valueNode)) {
+          name = valueNode.text;
+        }
+        if (key === "function" && ts.isIdentifier(valueNode)) {
+          identifier = valueNode;
+        }
+        if (key === "description" && ts.isStringLiteral(valueNode)) {
+          description = valueNode.text;
         }
       }
-    } else if (ts.isShorthandPropertyAssignment(prop)) {
-      identifier = prop.name;
     }
-  
-    if (!identifier) {
-      console.log("No identifier for property", prop.getText());
+
+    if (!name || !identifier) {
+      console.warn("Skipping invalid actionRegistry entry:", element.getText());
       continue;
     }
-  
+
     const resolved = resolveFunctionSignature(identifier);
     if (!resolved) {
       console.log(`Could not resolve function signature for ${identifier.text}`);
       continue;
     }
-  
+
     const parameters = extractParams(resolved.signature);
-  
+    
     actions.push({
-      name: prop.name.getText(),
+      name,
       parameters,
       ...(description ? { description } : {})
     });
-  }  
+  }
+
   const outPath = path.join(projectRoot, 'src/abra-actions/__generated__/actions.json');
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify({ actions }, null, 2));
   console.log(`✅ Wrote actions.json based on actionRegistry.ts (${actions.length} action(s))`);
 }
-
 
 
 function writeActionRegistry(_: any, root: string): void {
