@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 
 const BACKEND_URL = "https://api.abra-actions.com";
 
-type ActionDefinition = {
+export type ActionDefinition = {
     name: string;
     description: string;
     parameters: Record<string, any>;
@@ -58,7 +58,7 @@ const loadFonts = () => {
   }
 };
 
-const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
+export const AbraAssistant: React.FC<AbraAssistantProps> = ({ config }) => {
   const { apiKey, actionRegistry, actions } = config;
   
   useEffect(() => {

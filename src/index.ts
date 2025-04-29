@@ -4,6 +4,9 @@ import * as ts from 'typescript';
 import fs from 'fs';
 import path from 'path';
 
+export { AbraAssistant } from "./AbraAssistant";
+export type { AbraConfig } from "./AbraAssistant";
+
 
 function serializeType(
   type: ts.Type,
