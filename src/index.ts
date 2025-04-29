@@ -239,9 +239,9 @@ export type RegistryEntry = {
   suggestion?: string,
 }
 
-const actionRegistry = {
+const actionRegistry: RegistryEntry[] = [
   // REGISTER FUNCTIONS HERE:
-};
+];
 
 export default actionRegistry
 `;
