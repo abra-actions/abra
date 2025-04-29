@@ -24,7 +24,7 @@
     "access": "public"
   },
   "author": "abra-actions",
-  "type": "module",
+  "type": "commonjs",
   "main": "dist/index.js",
   "bin": {
     "abra-actions": "dist/index.js"
