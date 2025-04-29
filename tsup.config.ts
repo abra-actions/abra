@@ -1,10 +1,24 @@
 import { defineConfig } from 'tsup';
 
-export default defineConfig({
-  entry: ['src/index.ts'],
-  format: ['esm', 'cjs'],
-  sourcemap: true,
-  dts: true,
-  clean: true,
-  external: ['fs', 'path', 'os', 'crypto', 'perf_hooks', 'inspector'],
-});
+export default defineConfig([
+  {
+    entry: ['src/index.ts'],
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    clean: true,
+    external: [], 
+  },
+  {
+    entry: ['src/cli.ts'],
+    format: ['cjs'],
+    platform: 'node',
+    dts: false,
+    sourcemap: true,
+    clean: false,
+    external: ['fs', 'path', 'typescript'],
+    banner: {
+      js: '#!/usr/bin/env node'
+    }
+  }
+]);
