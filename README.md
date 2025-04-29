@@ -129,7 +129,7 @@ This command:
   - Function Name
   - Function Description (optional)
   - Parameter Names
-  - Destructed Types
+  - Destructured Types
 
 ---
 
