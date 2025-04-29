@@ -24,7 +24,7 @@
     "access": "public"
   },
   "author": "abra-actions",
-  "type": "commonjs",
+  "type": "module",
   "main": "dist/index.js",
   "bin": {
     "abra-actions": "dist/index.js"
@@ -42,10 +42,6 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./AbraAssistant": {
-      "import": "./dist/AbraAssistant.js",
-      "types": "./dist/AbraAssistant.d.ts"
     }
   },
   "scripts": {

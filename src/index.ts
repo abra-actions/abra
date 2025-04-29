@@ -236,8 +236,9 @@ function writeActionRegistry(_: any, root: string): void {
 // Import your functions below and register them.
 
 export type RegistryEntry = {
+  name: string
   function: Function,
-  description?: string,
+  description: string,
   suggested?: boolean,
   suggestion?: string,
 }
