@@ -6,6 +6,5 @@ export default defineConfig({
   sourcemap: true,
   dts: true,
   clean: true,
-  splitting: false, 
-  minify: false     
+  external: ['fs', 'path', 'os', 'crypto', 'perf_hooks', 'inspector'],
 });

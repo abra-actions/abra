@@ -1,127 +1,32 @@
 {
   "name": "@abra-actions/sdk",
   "version": "1.0.59",
-  "description": "A lightweight TypeScript SDK to expose frontend functions to LLMs via natural language. Includes action registration, typed parameter introspection, and a plug-and-play assistant UI.",
-  "keywords": [
-    "sdk",
-    "actions",
-    "frontend",
-    "natural language",
-    "LLM",
-    "typescript",
-    "abra"
-  ],
+  "description": "A lightweight TypeScript SDK to expose frontend functions to LLMs via natural language.",
+  "keywords": ["sdk", "actions", "frontend", "natural language", "LLM", "typescript", "abra"],
   "homepage": "https://github.com/abra-actions/abra#readme",
-  "bugs": {
-    "url": "https://github.com/abra-actions/abra/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/abra-actions/abra.git"
-  },
+  "repository": { "type": "git", "url": "git+https://github.com/abra-actions/abra.git" },
   "license": "MIT",
-  "publishConfig": {
-    "access": "public"
-  },
   "author": "abra-actions",
   "type": "commonjs",
   "main": "dist/index.js",
-  "bin": {
-    "abra-actions": "dist/index.js"
-  },
-  "files": [
-    "dist",
-    "src/__generated__",
-    "src/actionRegistry.ts",
-    "src/abra-executor.ts",
-    "src/actions.json",
-    "src/AbraAssistant.css"
-  ],
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     }
   },
+  "files": ["dist"],
   "scripts": {
-    "build": "tsup && node scripts/attachShebang.cjs && chmod +x dist/index.js"
+    "build": "tsup"
   },
   "dependencies": {
-    "ansi-regex": "^6.1.0",
-    "ansi-styles": "^6.2.1",
-    "any-promise": "^1.3.0",
-    "balanced-match": "^1.0.2",
-    "brace-expansion": "^2.0.1",
-    "bundle-require": "^5.1.0",
-    "cac": "^6.7.14",
-    "chokidar": "^4.0.3",
-    "color-convert": "^2.0.1",
-    "color-name": "^1.1.4",
-    "commander": "^4.1.1",
-    "consola": "^3.4.2",
-    "cross-spawn": "^7.0.6",
-    "debug": "^4.4.0",
-    "eastasianwidth": "^0.2.0",
-    "emoji-regex": "^9.2.2",
-    "esbuild": "^0.25.2",
-    "fdir": "^6.4.3",
-    "foreground-child": "^3.3.1",
-    "glob": "^10.4.5",
-    "is-fullwidth-code-point": "^3.0.0",
-    "isexe": "^2.0.0",
-    "jackspeak": "^3.4.3",
-    "joycon": "^3.1.1",
-    "lilconfig": "^3.1.3",
-    "lines-and-columns": "^1.2.4",
-    "load-tsconfig": "^0.2.5",
-    "lodash.sortby": "^4.7.0",
-    "lru-cache": "^10.4.3",
-    "minimatch": "^9.0.5",
-    "minipass": "^7.1.2",
-    "ms": "^2.1.3",
-    "mz": "^2.7.0",
-    "object-assign": "^4.1.1",
-    "package-json-from-dist": "^1.0.1",
-    "path-key": "^3.1.1",
-    "path-scurry": "^1.11.1",
-    "picocolors": "^1.1.1",
-    "picomatch": "^4.0.2",
-    "pirates": "^4.0.7",
-    "postcss-load-config": "^6.0.1",
-    "punycode": "^2.3.1",
-    "readdirp": "^4.1.2",
-    "resolve-from": "^5.0.0",
-    "rollup": "^4.40.0",
-    "shebang-command": "^2.0.0",
-    "shebang-regex": "^3.0.0",
-    "signal-exit": "^4.1.0",
-    "source-map": "^0.8.0-beta.0",
-    "string-width": "^5.1.2",
-    "string-width-cjs": "^4.2.3",
-    "strip-ansi": "^7.1.0",
-    "strip-ansi-cjs": "^6.0.1",
-    "sucrase": "^3.35.0",
-    "thenify": "^3.3.1",
-    "thenify-all": "^1.6.0",
-    "tinyexec": "^0.3.2",
-    "tinyglobby": "^0.2.12",
-    "tr46": "^1.0.1",
-    "tree-kill": "^1.2.2",
-    "ts-interface-checker": "^0.1.13",
-    "undici-types": "^6.21.0",
-    "webidl-conversions": "^4.0.2",
-    "whatwg-url": "^7.1.0",
-    "which": "^2.0.2",
-    "wrap-ansi": "^8.1.0",
-    "wrap-ansi-cjs": "^7.0.0"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
     "tsup": "^8.4.0",
     "typescript": "^5.8.3"
   }
